@@ -1095,19 +1095,6 @@ h3 {
   right: -7px;
   top: -8px;
 }
-.seat-online {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: #9ec081;
-  position: absolute;
-  left: 34px;
-  bottom: 10px;
-  border: 1px solid #244e36;
-}
-.seat-online.away {
-  background: #b59156;
-}
 .position-0 {
   bottom: 13px;
   left: 50%;
@@ -3158,16 +3145,6 @@ fieldset > label {
   }
   .position-2 {
     top: 60px;
-  }
-  .seat-online {
-    left: 26px;
-    bottom: 7px;
-    width: 4px;
-    height: 4px;
-  }
-  .position-0 .seat-online {
-    left: 33px;
-    bottom: 9px;
   }
   .seat-timer {
     font-size: 6px;

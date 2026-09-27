@@ -19,6 +19,9 @@
 - Click or tap anywhere on a player's card (avatar, name, points, or seat wind) to inspect
   declared melds, bonus tiles, and numbered discards in play order. Called and Riichi discards
   have text labels. Keyboard users can focus the card and press Enter or Space.
+- Human player cards show presence at the bottom-left: a blue circle with a check for online,
+  or an amber circle with a dash for offline. Hover the circle or focus the card to read its
+  Online/Offline tooltip. The symbol and accessible description distinguish states without color.
 - All four hands appear on the board after setup. Your row shows your own tile faces; opponents
   show backs. Use the larger rack below the board to select, arrange, and discard your tiles.
 - **Queue discards** enters selection mode. Pick physical tiles in order, then click
@@ -45,12 +48,19 @@
   player's seat. Resume restores its hand and shifts the deadline by the pause duration. If
   others remain or return, play continues with bots. Leaving without saving preserves any
   previously created bookmarks; remove them under Saved tables when no longer needed.
+  The lobby's collapsed **Saved tables** section only shows your browser's bookmarked tables
+  with no players online. Other players' paused tables are excluded. Live tables remain shared.
 
 ## Storage and privacy
 
 Profiles use random bearer credentials, stored in localStorage for normal guests and
 sessionStorage for isolated `?guest=1` tabs. The server stores credential hashes, profiles,
-rooms, chat and hand history. Preferences use player-ID localStorage keys. Clearing the
+rooms, chat and hand history. Bookmarks use `four-winds-saved-tables:<player ID>` in localStorage,
+or sessionStorage for isolated guests. The bookmark list is never copied from the server;
+even the same credential in another browser starts with no bookmarks. Clearing the list removes
+it from this browser, and ordinary tabs update when another tab changes it. Server-side room
+reservations still preserve paused hands; old server-only bookmark lists are no longer displayed.
+Existing rooms remain reachable by invitation code. Preferences use player-ID localStorage keys. Clearing the
 credential loses access to that guest identity. No cookies are needed for profile identity.
 Only public slot numbers, dice results and dealing seats describe the wall in client snapshots;
 physical tile IDs and wall order remain on the server. Lesson endpoints operate on fixed,

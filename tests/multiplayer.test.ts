@@ -347,7 +347,7 @@ describe('social play and saved profiles', () => {
       hand = [...a.state.room!.game!.players[0].hand];
     expect((await a.command('leave', { save: true })).ok).toBe(true);
     expect(a.state.room).toBeNull();
-    expect(a.state.savedTables?.[0].code).toBe(code);
+    expect(a.state).not.toHaveProperty('savedTables');
     expect(service.rooms.get(code)?.reservedSeats).toHaveProperty(a.state.profile.id, 0);
     a.socket.disconnect();
     service.close();
@@ -358,6 +358,21 @@ describe('social play and saved profiles', () => {
     expect(again.state.room!.game!.seat).toBe(0);
     expect(again.state.room!.game!.players[0].hand).toEqual(hand);
     expect(again.state.room!.host).toBe(again.state.profile.id);
+  });
+  it('does not let another profile release a saved table reservation', async () => {
+    const owner = await client(),
+      stranger = await client();
+    await owner.command('create', { name: 'Private bookmark', rules: PRESETS.mcr, bots: true });
+    const code = owner.state.room!.code;
+    await owner.command('leave', { save: true });
+    const room = service.rooms.get(code)!;
+    const pausedAt = room.pausedAt;
+    expect((await stranger.command('forget-table', code)).ok).toBe(true);
+    expect(service.rooms.get(code)).toBe(room);
+    expect(room.pausedAt).toBe(pausedAt);
+    expect(room.reservedSeats).toHaveProperty(owner.state.profile.id, 0);
+    await owner.command('forget-table', code);
+    expect(service.rooms.has(code)).toBe(false);
   });
   it('stores the full completed hand under its participant and rejects another profile’s history ID', async () => {
     const a = await client(),

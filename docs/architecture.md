@@ -180,7 +180,9 @@ advance the authoritative engine.
 - Full completed-hand histories are capped at 100 per profile, but are still embedded in every
   snapshot and held in memory. This is the main remaining capacity blocker.
 - On load, human seats are marked disconnected. A returning credential restores the seat.
-  Saved tables preserve seats; there is no password recovery or account federation.
+  Saved tables preserve seats on the server, while bookmarks live in browser storage keyed by
+  profile ID. The lobby intersects paused rooms with that local list. There is no password
+  recovery or account federation.
 - `TRUST_PROXY=1` is enabled only in the private Caddy deployment. The handshake limiter then
   uses the rightmost valid `X-Forwarded-For` address. Direct deployments ignore that header by
   default. Caddy normally overwrites untrusted forwarding headers; see its

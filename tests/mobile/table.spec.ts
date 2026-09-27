@@ -14,6 +14,17 @@ test('the whole player card opens public tiles by touch in portrait and landscap
     { width: 844, height: 390 },
   ]) {
     await page.setViewportSize(viewport);
+    for (const card of await page.locator('.player-badge').all()) {
+      const parent = (await card.boundingBox())!;
+      const dot = (await card.locator('.seat-online').boundingBox())!;
+      expect(dot.width).toBeGreaterThanOrEqual(14);
+      expect(dot.height).toBeGreaterThanOrEqual(14);
+      expect(dot.x - parent.x).toBeGreaterThanOrEqual(0);
+      expect(dot.x - parent.x).toBeLessThanOrEqual(6);
+      expect(parent.y + parent.height - dot.y - dot.height).toBeGreaterThanOrEqual(0);
+      expect(parent.y + parent.height - dot.y - dot.height).toBeLessThanOrEqual(6);
+      await expect(card).toHaveAccessibleDescription('Online');
+    }
     await page.getByRole('button', { name: 'Inspect Mei tiles' }).locator('.seat-wind').tap();
     await expect(page.locator('dialog h2')).toHaveText('Mei');
     await expect(page.locator('.player-discards .tile')).toHaveCount(6);

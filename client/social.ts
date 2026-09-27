@@ -1,4 +1,4 @@
-import type { AppState, GameEvent, HandRecord } from '../shared/types';
+import type { AppState, GameEvent, HandRecord, SavedTable } from '../shared/types';
 import { REACTIONS } from '../shared/avatars';
 import { tileName } from '../shared/tiles';
 import { tileStatic } from './tile-art';
@@ -34,6 +34,8 @@ export class SocialUI {
     private dialog: (id: string, title: string, body: string, wide?: boolean) => void,
     private getTable: () => MahjongTable | null,
     private toast: (s: string, error?: boolean) => void,
+    private savedTables: () => SavedTable[],
+    private forgetTable: (code: string) => Promise<void>,
   ) {
     document.addEventListener('click', this.click);
     document.addEventListener('submit', this.submit);
@@ -285,7 +287,14 @@ export class SocialUI {
     this.dialog(
       'saved-tables',
       'Your saved tables',
-      `<div class="history-list">${(this.state?.savedTables ?? []).map((r) => `<div><strong>${esc(r.name)}</strong><small>${r.code}</small><button class="button primary" data-join="${r.code}" ${r.available ? '' : 'disabled'}>Resume</button><button class="text-button" data-forget="${r.code}">Remove bookmark</button></div>`).join('') || '<p>Choose “Save and leave” when leaving a table to keep it here.</p>'}</div>`,
+      `<p>Bookmarks for your profile in this browser.</p><div class="history-list">${
+        this.savedTables()
+          .map(
+            (r) =>
+              `<div><strong>${esc(r.name)}</strong><small>${esc(r.code)}${r.available ? '' : ' · Unavailable'}</small><button class="button primary" data-join="${esc(r.code)}" ${r.available ? '' : 'disabled'}>Resume</button><button class="text-button" data-forget="${esc(r.code)}">Remove bookmark</button></div>`,
+          )
+          .join('') || '<p>Choose “Save and leave” when leaving a table to keep it here.</p>'
+      }</div>`,
     );
   }
   private click = async (e: Event) => {
@@ -326,8 +335,11 @@ export class SocialUI {
         return;
       }
       if (b.dataset.forget) {
-        await this.command('forget-table', b.dataset.forget);
-        this.showSaved();
+        try {
+          await this.forgetTable(b.dataset.forget);
+        } finally {
+          this.showSaved();
+        }
         return;
       }
       switch (b.dataset.social) {
