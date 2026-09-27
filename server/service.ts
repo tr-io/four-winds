@@ -1,9 +1,20 @@
+import { checkLesson, lessonClaims } from './lessons';
+import { AVATAR_CHOICES, REACTIONS } from '../shared/avatars';
 import { randomBytes, randomInt, createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { Server, type Socket } from 'socket.io';
 import { z } from 'zod';
-import type { AppState, Profile, Room, Rules, Lobby, LobbyView } from '../shared/types';
+import type {
+  AppState,
+  Profile,
+  Room,
+  Rules,
+  Lobby,
+  LobbyView,
+  ChatMessage,
+  HandRecord,
+} from '../shared/types';
 import { PRESETS, rulesSchema } from '../shared/rules';
 import { analyzeHand } from './hand-analysis';
 import {
@@ -24,9 +35,17 @@ type Session = {
   rulesets: Rules[];
   room: string | null;
   lobby: string;
+  savedTables?: string[];
+  history?: HandRecord[];
 };
-type Store = { version: 1; sessions: Session[]; rooms: Room[]; lobbies: Lobby[] };
-const avatars = ['jade', 'clay', 'gold', 'blue'];
+type Store = {
+  version: 1;
+  sessions: Session[];
+  rooms: Room[];
+  lobbies: Lobby[];
+  chat?: Record<string, ChatMessage[]>;
+};
+const avatars = AVATAR_CHOICES;
 const hash = (s: string) => createHash('sha256').update(s).digest('hex');
 const textInput = z.string().trim().min(1).max(24);
 export class GameService {
@@ -35,6 +54,8 @@ export class GameService {
   lobbies = new Map<string, Lobby>([
     ['FOURWN', { code: 'FOURWN', name: 'The Four Winds Club', host: '', createdAt: 0 }],
   ]);
+  private chat: Record<string, ChatMessage[]> = {};
+  private chatDue = new Map<string, number>();
   private sockets = new Map<string, Set<Socket>>();
   private seen = new Map<string, Map<string, unknown>>();
   private botDue = new Map<string, { decision: number; at: number }>();
@@ -46,6 +67,7 @@ export class GameService {
     if (file && existsSync(file)) {
       const data = JSON.parse(readFileSync(file, 'utf8')) as Store;
       if (data.version !== 1) throw new Error('Unsupported saved state version.');
+      this.chat = data.chat ?? {};
       for (const s of data.sessions) {
         s.lobby ??= 'FOURWN';
         s.rulesets = s.rulesets.map((r) => rulesSchema.parse(r));
@@ -82,6 +104,7 @@ export class GameService {
         sessions: [...this.sessions.values()],
         rooms: [...this.rooms.values()],
         lobbies: [...this.lobbies.values()],
+        chat: this.chat,
       } satisfies Store),
       { mode: 0o600 },
     );
@@ -156,7 +179,9 @@ export class GameService {
         const response = { ok: true, ...result };
         seen.set(cmd.id, response);
         if (seen.size > 200) seen.delete(seen.keys().next().value!);
-        if (cmd.type !== 'analyze-hand') {
+        if (
+          !['analyze-hand', 'history-detail', 'lesson-check', 'lesson-claims'].includes(cmd.type)
+        ) {
           this.persist();
           this.broadcast();
         }
@@ -198,6 +223,58 @@ export class GameService {
       if (r.host !== s.profile.id) throw new Error('Only the host can do that.');
       return r;
     };
+    if (type === 'lesson-check') return { check: checkLesson(input) };
+    if (type === 'lesson-claims') return { claims: lessonClaims(input) };
+    if (type === 'chat') {
+      const data = z
+        .object({
+          scope: z.enum(['table', 'lobby']),
+          text: z.string().trim().min(1).max(300),
+          reaction: z.boolean().default(false),
+        })
+        .parse(input);
+      if (data.reaction && !(REACTIONS as readonly string[]).includes(data.text))
+        throw new Error('Choose a table reaction.');
+      if (data.scope === 'table') requireRoom();
+      const now = Date.now();
+      if (now < (this.chatDue.get(s.profile.id) ?? 0))
+        throw new Error('Wait a moment before sending again.');
+      this.chatDue.set(s.profile.id, now + 700);
+      const list = data.scope === 'table' ? (room!.chat ??= []) : (this.chat[s.lobby] ??= []);
+      list.push({
+        id: randomBytes(8).toString('hex'),
+        at: now,
+        player: s.profile.id,
+        name: s.profile.name,
+        text: data.text,
+        reaction: data.reaction,
+      });
+      if (list.length > 100) list.shift();
+      return {};
+    }
+    if (type === 'history-detail') {
+      const id = z.string().max(100).parse(input);
+      const record = s.history?.find((r) => r.id === id);
+      if (!record) throw new Error('That hand is no longer in your history.');
+      return { record };
+    }
+    if (type === 'forget-table') {
+      const code = z.string().parse(input);
+      s.savedTables = s.savedTables?.filter((c) => c !== code);
+      const r = this.rooms.get(code);
+      if (r) {
+        r.savedBy = r.savedBy?.filter((id) => id !== s.profile.id);
+        if (r.pausedAt && r.game) {
+          const elapsed = Date.now() - r.pausedAt;
+          if (r.game.turnDeadline) r.game.turnDeadline += elapsed;
+          if (r.game.claim) r.game.claim.deadline += elapsed;
+          delete r.pausedAt;
+        }
+        if (r.reservedSeats) delete r.reservedSeats[s.profile.id];
+        if (!r.savedBy?.length && !r.players.some((p) => !p.bot)) this.rooms.delete(code);
+      }
+      return {};
+    }
     if (type === 'create-lobby') {
       if (room) throw new Error('Leave your table before changing lobbies.');
       if (this.lobbies.size >= 100) throw new Error('The lobby limit has been reached.');
@@ -219,7 +296,10 @@ export class GameService {
     }
     if (type === 'profile') {
       const data = z
-        .object({ name: textInput, avatar: z.enum(['jade', 'clay', 'gold', 'blue']) })
+        .object({
+          name: textInput,
+          avatar: z.enum([...AVATAR_CHOICES, 'jade', 'clay', 'gold', 'blue']),
+        })
         .parse(input);
       Object.assign(s.profile, data);
       if (room) {
@@ -268,7 +348,10 @@ export class GameService {
       if (data.bots) this.fillBots(r);
       this.rooms.set(code, r);
       s.room = code;
-      if (data.bots) r.game = startGame(r.rules, r.players, -1);
+      if (data.bots) {
+        r.game = startGame(r.rules, r.players, -1);
+        this.recordResult(r, 'waiting');
+      }
       return { code };
     }
     if (type === 'configure-rules') {
@@ -297,7 +380,13 @@ export class GameService {
       }
       const r = this.rooms.get(code);
       if (!r) throw new Error('That room code was not found.');
-      const botSeat = r.players.findIndex((p) => p.bot);
+      const reserved = r.reservedSeats?.[s.profile.id];
+      const botSeat =
+        reserved !== undefined && r.players[reserved]?.bot
+          ? reserved
+          : r.players.findIndex(
+              (p, i) => p.bot && !Object.values(r.reservedSeats ?? {}).includes(i),
+            );
       if (r.players.length === 4 && botSeat < 0) throw new Error('This table is full.');
       if (botSeat >= 0) {
         const p = r.players[botSeat];
@@ -307,13 +396,24 @@ export class GameService {
         p.ready = false;
         if (r.game) event(r.game, `${s.profile.name} joined the table, taking a bot seat.`);
       } else r.players.push(newPlayer(s.profile, r.rules));
+      if (r.reservedSeats) delete r.reservedSeats[s.profile.id];
+      if (!r.host) r.host = s.profile.id;
       s.room = code;
       s.lobby = r.lobby;
       return {};
     }
     if (type === 'leave') {
+      const { save } = z.object({ save: z.boolean().default(false) }).parse(input ?? {});
       const r = requireRoom(),
         seat = r.players.findIndex((p) => p.profile.id === s.profile.id);
+      if (save) {
+        s.savedTables ??= [];
+        if (!s.savedTables.includes(r.code)) s.savedTables.push(r.code);
+        r.savedBy = [...new Set([...(r.savedBy ?? []), s.profile.id])];
+        if (r.game && !r.players.some((p, i) => i !== seat && !p.bot)) {
+          (r.reservedSeats ??= {})[s.profile.id] = seat;
+        }
+      }
       if (r.game) {
         const p = r.players[seat];
         p.bot = true;
@@ -328,7 +428,10 @@ export class GameService {
       } else r.players.splice(seat, 1);
       s.room = null;
       if (r.host === s.profile.id) r.host = r.players.find((p) => !p.bot)?.profile.id ?? '';
-      if (!r.players.some((p) => !p.bot)) this.rooms.delete(r.code);
+      if (!r.players.some((p) => !p.bot)) {
+        if (r.savedBy?.length) r.pausedAt = Date.now();
+        else this.rooms.delete(r.code);
+      }
       return {};
     }
     if (type === 'fill-bots') {
@@ -341,12 +444,14 @@ export class GameService {
       const r = host();
       if (r.game) throw new Error('The match is already in progress.');
       r.game = startGame(r.rules, r.players, -1);
+      this.recordResult(r, 'waiting');
       return {};
     }
     if (type === 'rematch') {
       const r = host();
       if (r.game?.phase !== 'finished') throw new Error('Finish this match first.');
       r.game = startGame(r.rules, r.players, -1);
+      this.recordResult(r, 'waiting');
       return {};
     }
     if (type === 'analyze-hand') {
@@ -427,7 +532,23 @@ export class GameService {
         if (g.result?.winner === i) p.profile.wins++;
         if (!p.bot) {
           const session = [...this.sessions.values()].find((s) => s.profile.id === p.profile.id);
-          if (session) session.profile = p.profile;
+          if (session) {
+            session.profile = p.profile;
+            session.history ??= [];
+            session.history.unshift({
+              id: randomBytes(12).toString('hex'),
+              room: r.code,
+              table: r.name,
+              preset: g.rules.preset,
+              at: Date.now(),
+              handNumber: g.handNumber,
+              players: g.players.map((p) => p.profile.name),
+              seat: i,
+              events: structuredClone(g.events),
+              result: structuredClone(g.result!),
+            });
+            session.history = session.history.slice(0, 100);
+          }
         }
       }
   }
@@ -446,6 +567,12 @@ export class GameService {
       lobbies: [...this.lobbies.values()]
         .filter((l) => l.code === 'FOURWN' || l.host === s.profile.id || l.code === s.lobby)
         .map(lobbyView),
+      chat: this.chat[s.lobby] ?? [],
+      savedTables: (s.savedTables ?? []).map((code) => {
+        const r = this.rooms.get(code);
+        return { code, name: r?.name ?? code, lobby: r?.lobby ?? '', available: !!r };
+      }),
+      history: (s.history ?? []).map(({ events, result, ...summary }) => summary),
       profile: s.profile,
       rulesets: s.rulesets,
       serverTime: Date.now(),
@@ -467,6 +594,7 @@ export class GameService {
       room:
         room && seat >= 0
           ? {
+              chat: room.chat ?? [],
               code: room.code,
               name: room.name,
               host: room.host,

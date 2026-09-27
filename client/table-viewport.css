@@ -1,0 +1,138 @@
+/* Reserve real space for the HUD instead of painting it over concealed hands.
+   Short viewports can scroll the game window; the board never collapses under the rack. */
+.game-window {
+  grid-template-rows: auto minmax(360px, 1fr) auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.game-toolbar {
+  min-height: 54px;
+  flex-wrap: wrap;
+  padding-block: 5px;
+}
+.game-tools {
+  flex-wrap: wrap;
+}
+.game-window #live-table {
+  inset: 82px clamp(115px, 16%, 190px) 70px;
+}
+.game-window .position-0 {
+  left: 50%;
+  right: auto;
+  bottom: 12px;
+  top: auto;
+  transform: translateX(-50%);
+}
+.game-window .position-2 {
+  top: 12px;
+}
+.game-window .position-1,
+.game-window .position-3 {
+  top: 43%;
+  transform: translateY(-50%);
+}
+.game-window .position-1 {
+  left: auto;
+  right: 24px;
+}
+.game-window .position-3 {
+  right: auto;
+  left: 24px;
+}
+.game-window .recent-actions {
+  left: 12px;
+  bottom: 12px;
+  width: min(184px, 25%);
+}
+.game-window .discard-inspector {
+  inset: 0;
+  transform: none;
+  pointer-events: none;
+}
+.game-window .discard-trigger {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  pointer-events: auto;
+}
+.game-window .discard-ledger {
+  left: auto;
+  right: 12px;
+  top: auto;
+  bottom: 70px;
+  transform: none;
+  width: min(450px, calc(100% - 24px));
+  min-height: 0;
+  max-height: min(calc(100% - 82px), calc(100dvh - 24px));
+  pointer-events: auto;
+}
+.game-window .discard-ledger > header,
+.game-window .discard-ledger > p,
+.game-window .discard-group .tile {
+  flex-shrink: 0;
+}
+.game-window #discard-groups {
+  min-height: 0;
+  align-content: start;
+}
+.game-window .lotus {
+  right: 70px;
+}
+.game-window .exposed-hand {
+  max-height: none;
+}
+@media (max-width: 650px) {
+  .game-window #live-table {
+    inset: 102px 82px 92px;
+  }
+  .game-window .position-2 {
+    top: 46px;
+  }
+  .game-window .position-1 {
+    right: 10px;
+  }
+  .game-window .position-3 {
+    left: 10px;
+  }
+  .game-window .position-1,
+  .game-window .position-3 {
+    top: 45%;
+    max-width: 78px;
+    padding: 6px;
+    gap: 4px;
+  }
+  .game-window .position-1 .player-name-button,
+  .game-window .position-3 .player-name-button {
+    max-width: 42px;
+  }
+  .game-window .recent-actions {
+    width: 130px;
+    bottom: 65px;
+    left: 9px;
+  }
+  .game-window .lotus {
+    right: 62px;
+  }
+}
+@media (max-height: 500px) and (min-width: 651px) and (max-width: 1100px) {
+  .game-window {
+    grid-template-rows: auto minmax(320px, 1fr);
+  }
+  .game-toolbar {
+    min-height: 42px;
+  }
+  .game-window #live-table {
+    inset: 88px 96px 65px;
+  }
+  .game-window .position-2 {
+    top: 38px;
+  }
+  .game-window .position-1,
+  .game-window .position-3 {
+    top: 45%;
+    max-width: 85px;
+  }
+  .game-window .recent-actions {
+    width: 130px;
+  }
+}

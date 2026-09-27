@@ -1,6 +1,7 @@
+import { wallBreak, wallSlot } from '../shared/wall';
 import { randomInt } from 'node:crypto';
 import Majiang from '@kobalab/majiang-core';
-import { counts, isBonus, kind, makeWall, sorted, tileName } from '../shared/tiles';
+import { counts, isBonus, kind, makeWall, sorted, tileName, seededRandom } from '../shared/tiles';
 import type {
   ClaimKind,
   Game,
@@ -49,8 +50,7 @@ export function event(
   tile?: Tile,
   now = Date.now(),
 ) {
-  g.events.push({ id: ++g.eventId, at: now, text, type, seat, tile });
-  if (g.events.length > 120) g.events.shift();
+  g.events.push({ id: ++g.eventId, at: now, text, type, seat, tile, handNumber: g.handNumber });
 }
 export function startGame(rules: Rules, players: Player[], seed: number, now = Date.now()): Game {
   if (players.length !== 4) throw new Error('Four seats must be filled to start.');
@@ -98,6 +98,7 @@ function resetTurnFlags(p: Player) {
 }
 export function dealHand(g: Game, now = Date.now()) {
   g.handNumber++;
+  g.events = [];
   g.wall = makeWall(
     g.rules.preset,
     (g.seed + Math.imul(g.handNumber, 2654435761)) >>> 0,
@@ -110,6 +111,19 @@ export function dealHand(g: Game, now = Date.now()) {
       const j = randomInt(i + 1);
       [g.wall[i], g.wall[j]] = [g.wall[j], g.wall[i]];
     }
+  const random = seededRandom((g.seed ^ Math.imul(g.handNumber, 1907)) >>> 0);
+  const die = () => (g.seed === -1 ? randomInt(1, 7) : 1 + Math.floor(random() * 6));
+  const dice = Array.from({ length: g.rules.preset === 'mcr' ? 2 : 1 }, () => [die(), die()]);
+  g.setup = {
+    total: g.wall.length,
+    dice,
+    ...wallBreak(g.wall.length, g.dealer, dice),
+    front: 0,
+    back: 0,
+    dead: 0,
+    deal: [],
+  };
+  g.wall = [...g.wall.slice(g.setup.breakIndex), ...g.wall.slice(0, g.setup.breakIndex)];
   g.deadWall = [];
   g.dora = [];
   g.ura = [];
@@ -124,6 +138,7 @@ export function dealHand(g: Game, now = Date.now()) {
   g.reserve = g.rules.preset === 'singapore' ? 15 : 0;
   if (g.rules.preset === 'riichi') {
     g.deadWall = g.wall.splice(-14);
+    g.setup.back = g.setup.dead = 14;
     g.dora = [g.deadWall[4]];
     g.ura = [5, 7, 9, 11, 13].map((i) => g.deadWall[i]);
   }
@@ -150,15 +165,70 @@ export function dealHand(g: Game, now = Date.now()) {
     undefined,
     now,
   );
-  // Deal thirteen usable tiles to each seat. Bonuses are exposed, replaced
-  // from the back, and accounted for separately from the concealed hand.
-  for (let n = 0; n < 13; n++)
+  event(
+    g,
+    `Dice ${dice.map((r) => r.join(' + ')).join(' / ')} · break after stack ${g.setup.breakStack} at ${g.players[g.setup.breakSeat].profile.name}’s wall.`,
+    'info',
+    undefined,
+    undefined,
+    now,
+  );
+  // Three rounds of four physical tiles, then singles (East's extra is the third stack top).
+  const raw = (seat: number) => {
+    const tile = drawWall(g, false, seat, true)!;
+    g.players[seat].hand.push(tile);
+    return tile;
+  };
+  for (let packet = 0; packet < 3; packet++)
     for (let offset = 0; offset < 4; offset++)
-      takeTile(g, (g.dealer + offset) % 4, false, now, true);
+      for (let n = 0; n < 4; n++) raw((g.dealer + offset) % 4);
+  for (let offset = 0; offset < 4; offset++) raw((g.dealer + offset) % 4);
+  const extra = g.rules.preset === 'singapore' ? null : raw(g.dealer);
+  for (let offset = 0; offset < 4; offset++) {
+    const seat = (g.dealer + offset) % 4,
+      p = g.players[seat];
+    for (const tile of [...p.hand])
+      if (isBonus(tile)) {
+        p.hand.splice(p.hand.indexOf(tile), 1);
+        exposeBonus(g, seat, tile, true, now);
+        const replacement = takeTile(g, seat, true, now, true);
+        if (seat === g.dealer && tile === extra) p.drawn = replacement;
+      }
+    p.hand = sorted(p.hand);
+  }
   for (let seat = 0; seat < 4; seat++) if (checkFlowerWin(g, seat, now)) return;
-  enterTurn(g, g.dealer, now, true);
+  if (extra !== null) {
+    const p = g.players[g.dealer];
+    p.drawn ??= extra;
+    p.drawSource = isBonus(extra) ? 'bonus' : 'wall';
+    p.hasDrawn = true;
+  }
+  const front = g.setup.front,
+    back = g.setup.back;
+  enterTurn(g, g.dealer, now, extra === null);
+  if (extra === null) {
+    for (let offset = front; offset < g.setup.front; offset++)
+      g.setup.deal.push({ seat: g.dealer, slot: wallSlot(g.setup, offset) });
+    for (let offset = back; offset < g.setup.back; offset++)
+      g.setup.deal.push({ seat: g.dealer, slot: wallSlot(g.setup, g.setup.total - 1 - offset) });
+  }
+}
+function drawWall(g: Game, back: boolean, seat: number, initial = false) {
+  if (!g.wall.length) return undefined;
+  if (g.setup) {
+    const offset = back ? g.setup.total - 1 - g.setup.back++ : g.setup.front++;
+    if (initial) g.setup.deal.push({ seat, slot: wallSlot(g.setup, offset) });
+  }
+  return back ? g.wall.pop() : g.wall.shift();
 }
 function settle(g: Game, payments: number[]) {
+  event(
+    g,
+    payments.map((n, i) => `${g.players[i].profile.name} ${n >= 0 ? '+' : ''}${n}`).join(' · ') +
+      (g.rules.points ? ' points' : ' settlement (point tracking off)'),
+    'info',
+  );
+  g.events.at(-1)!.payments = [...payments];
   for (let i = 0; i < 4; i++) {
     if (g.rules.points) g.players[i].points += payments[i];
     if (g.rules.chips)
@@ -258,11 +328,11 @@ function takeTile(
     const index = g.kongCount - 1;
     if (index < 0 || index >= 4 || g.wall.length === 0) return null;
     tile = g.deadWall[index];
-    g.deadWall[index] = g.wall.pop()!;
+    g.deadWall[index] = drawWall(g, true, seat)!;
     g.dora.push(g.deadWall[4 + g.kongCount * 2]);
   } else {
     if (g.wall.length <= g.reserve) return null;
-    tile = replacement ? g.wall.pop() : g.wall.shift();
+    tile = drawWall(g, replacement, seat, initial);
   }
   p.drawSource = replacement ? 'kong' : 'wall';
   while (tile !== undefined && isBonus(tile)) {
@@ -270,7 +340,7 @@ function takeTile(
     if (g.phase === 'ended' || g.phase === 'finished') return null;
     p.drawSource = 'bonus';
     if (g.wall.length <= g.reserve) return null;
-    tile = g.wall.pop();
+    tile = drawWall(g, true, seat, initial);
   }
   if (tile === undefined) return null;
   p.hand.push(tile);

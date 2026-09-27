@@ -5,31 +5,58 @@ before relying on the snapshot. Start with the user's latest request.
 
 ## Resume here
 
-1. Read `git status` and recent commits. The UI refresh is on **`feat/local-table-themes`**, pushed as
-   [PR #1](https://github.com/tr-io/four-winds/pull/1). GitHub CI was running at handoff.
-   Follow the branch/PR workflow in AGENTS.md; the user replaced the old direct-to-main workflow.
-2. The club now uses a forest/jade palette with original vector lantern and wind-garden artwork.
-   In-game **Table settings → Jade Night / Porcelain Day** changes local environment, felt,
-   table frame, lighting, and UI colors. `client/table-theme.ts` stores the choice under a player-ID
-   localStorage key; no theme enters server state or commands. The club always stays dark.
-3. The duplicate concealed hand came from Three.js plus the HTML rack. `client/table.ts` now
-   omits the local concealed row in live games. `HandRack` remains the sole playable hand;
-   opponents' backs, public melds, bonuses, and discards stay in Three.js. The explicit hand
-   inspector and results still show details. English seat labels and mobile claim layout improved.
-4. Gameplay, rulesets, scores, and multiplayer remain server-owned. Existing selection, draw,
-   discard, claim, win, audio, and reduced-motion effects are preserved. Read the local-theme
-   section in [TESTING.md](TESTING.md) for normal-turn and deterministic claim checks.
-5. Verification: 75 unit/network/UI tests, 22 desktop browser tests, 10 Android/iPhone cases,
-   five deployment tests, build/type, formatting, and release Compose validation pass. The two
-   new mobile theme cases were rerun after fixing landscape claim/rack overflow; all eight
-   existing mobile cases passed in the preceding run. Review captures are in `.cache/ui-review/`
-   (local, ignored). Production has not been changed.
+1. Continue on **`feat/social-table-experience`**, [PR #2](https://github.com/tr-io/four-winds/pull/2).
+   The user explicitly requested staying on this feature branch. [PR #3](https://github.com/tr-io/four-winds/pull/3)
+   was merged into it as `f8859c3`; PR #2 remains open and main is unchanged. The top opponent hand was rendered but covered by its player card. Short
+   viewports also overlapped seat cards with recent actions and clipped the discard ledger.
+   `client/table-viewport.css` now reserves room around the canvas, and `table-camera.ts` fits
+   the whole table to that space. Short windows scroll internally. The ledger opens above its
+   bottom-right button, keeps tile faces from shrinking, and scrolls into view when pinned or
+   focused. Tile tooltips follow focused/hovered tiles during scroll. All opponent faces remain
+   concealed; the local hand remains in the HTML rack. Nine new regressions cover live viewport
+   resizing, seat/hand occlusion, ledger clipping, action access, and focused tooltips.
+2. **How to play** is now an interactive page with preset switching, tile explanations, a moving
+   turn walkthrough, hand grouping/checking, and competing-claim examples. `server/lessons.ts`
+   validates separate preset examples through the existing engine in isolated games; scoring,
+   minimums, dealer progression, and configured claim arbitration remain unchanged.
+3. Table additions: scoped lobby/table chat, emoji reactions, queued discards, player meld
+   inspection, DiceBear avatars, complete hand logs and profile history, saved-table bookmarks,
+   last-player seat reservation/pause, local board rotation, turn notifications, and interactive
+   garden/rain/pond ambience. See [feature guide](docs/social-and-learning.md) for behavior,
+   storage, supported notifications, attribution, and setup conventions.
+4. The server now records public dice/break/slot metadata. MCR has two throws, Riichi one;
+   Singapore uses the documented one-throw digital convention. Deals use packets and replacement
+   draws; the renderer walks adjacent wall stacks instead of removing tiles from all sides.
+   Tile dimensions/rows and wall corners are separated. Opponent concealed faces are never built
+   in Three.js, including when rotating. Existing saved games use a count-based wall fallback
+   until their next deal. Stable seats and initial host-as-East are preserved.
+5. Verification for the table/zoom fix: **92 unit/network tests**, **37 desktop browser tests**,
+   **12 mobile tests** (Android Chrome/iPhone WebKit), type/build, formatting, and diff checks pass.
+   The iPhone opening deal exposed an 18px rack overflow; the board minimum is now 360px, with
+   320px reserved for the landscape split layout. Viewport tests cover 320, 390, 640, 700, 768,
+   844, 960, and 1280 CSS pixels, including resizing after mount. Screenshots are in
+   `.cache/ui-review/table-zoom/` (ignored). All tests use isolated stores; production is unchanged.
+   The prior feature work also passed five deployment tests and release Compose validation.
+   The local review server at **localhost:3102** was last started with
+   `/tmp/four-winds-feature-review.json`; check availability before using it.
+
+6. The npm audit warning was DiceBear Core <=9.4.2 ([advisory](https://github.com/advisories/GHSA-gcr2-9v8m-gq45)).
+   Core and the three bundled styles are now 9.4.3. Fresh `npm ci` applies both scoring patches;
+   `npm audit` reports zero vulnerabilities. PR #3’s CI failed only during fixture shutdown.
+   A partial HTTP request reproduced the hang on Node 24; `tests/fixtures/http-server.ts` now
+   tracks and terminates test connections when closing. The regression fails with the old
+   cleanup and passes with the fix. This affects test servers only. On Node 24.21.0, all **93 unit**,
+   **37 desktop**, and **12 mobile** tests pass, as do build/types, formatting, and five deployment
+   tests. The dependency and fixture fixes are committed on the feature branch; check the latest
+   PR #2 CI run for remote verification.
 
 ## User preferences and decisions
 
 - Follow the branch → commit → push → PR workflow in [AGENTS.md](AGENTS.md), requested on
   27 September 2026. This supersedes the previous direct-to-main preference.
   Repository: `tr-io/four-winds`, remote `git@github.com:tr-io/four-winds.git`.
+- Continue this work on the existing feature branch per the user’s follow-up; do not create
+  another branch/PR for follow-up fixes to PR #2.
 - Work through authorized tasks without repeated confirmation. Explain actual blockers clearly.
 - The table, rack, claim prompts, settings, and help belong inside the game window. Keep actions
   visible on desktop and mobile. The user prefers a mahjong-themed game UI, clear visual state,

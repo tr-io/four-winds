@@ -1,5 +1,6 @@
 import { expect } from '@playwright/test';
 import { PerspectiveCamera, Vector3 } from 'three';
+import { tableFieldOfView } from '../../client/table-camera';
 import { applyAction, gameView } from '../../server/engine';
 import { test, setup, order, inViewport } from '../fixtures/table';
 
@@ -277,16 +278,16 @@ test('3D face inspection names visible tiles and never reveals a concealed tile'
   const game = await setup(page, tableServer, 'complete');
   const rect = (await page.locator('#live-table canvas').boundingBox())!;
   const aspect = rect.width / rect.height;
-  const camera = new PerspectiveCamera(aspect < 1.1 ? 56 : 40, aspect, 0.1, 100);
+  const camera = new PerspectiveCamera(tableFieldOfView(aspect), aspect, 0.1, 100);
   camera.position.set(0, 15, 12);
   camera.lookAt(0, 0, 0.7);
   camera.updateMatrixWorld();
   const point = (x: number, z: number) => {
-    const v = new Vector3(x, 0.254, z).project(camera);
+    const v = new Vector3(x, 0.178, z).project(camera);
     return { x: rect.x + ((v.x + 1) / 2) * rect.width, y: rect.y + ((1 - v.y) / 2) * rect.height };
   };
   // A face-up bonus away from the center's discard-ledger hit target.
-  const visible = point(4.7, 3.7);
+  const visible = point(-0.48, 4.8);
   expect(await page.evaluate((p) => document.elementFromPoint(p.x, p.y)?.tagName, visible)).toBe(
     'CANVAS',
   );
@@ -294,9 +295,9 @@ test('3D face inspection names visible tiles and never reveals a concealed tile'
   await expect(page.getByRole('tooltip')).toHaveText('Chrysanthemum');
   await page.mouse.click(visible.x, visible.y);
   await expect(page.getByRole('tooltip')).toHaveText('Chrysanthemum');
-  // Opposite hand, off-center to avoid its seat badge. The server has private tiles here.
-  expect(game.players[2].hand.length).toBe(13);
-  const hidden = point(2.82, -4.9);
+  // Right-hand seat, away from the HTML seat badges. The server has private tiles here.
+  expect(game.players[1].hand.length).toBe(13);
+  const hidden = point(5.46, 1.92);
   expect(await page.evaluate((p) => document.elementFromPoint(p.x, p.y)?.tagName, hidden)).toBe(
     'CANVAS',
   );
