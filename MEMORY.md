@@ -5,7 +5,8 @@ before relying on the snapshot. Start with the user's latest request.
 
 ## Current work
 
-- **`feat/live-table-ux`**, based on `origin/main` at `40462eb` after PR #7 merged.
+- **`feat/live-table-ux`**, committed and pushed to [PR #8](https://github.com/tr-io/four-winds/pull/8),
+  open for review. Based on `origin/main` at `40462eb` after PR #7 merged.
   The user requested implementation of the live-table UX from two supplied layout references,
   preserving actual game state and rules. Implementation and local verification are complete.
 - `client/main.ts` now groups Last Discard/Last Turn as expandable Recent activity (12 public
@@ -24,7 +25,8 @@ before relying on the snapshot. Start with the user's latest request.
   reserve their wrapped height. Compact seat cards wrap chip totals. The original lotus remains
   usable and clear of seat presence indicators.
 - [Control guide](docs/live-table-interface.md) records current semantics and how to try each
-  control. Commit/push and PR creation are the final handoff step; production is unchanged.
+  control. GitHub CI is pending after push. No merge or deployment was requested; production is
+  unchanged. Reuse this branch for follow-ups while PR #8 is open.
 
 ## Previous handoff
 
