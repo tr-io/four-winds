@@ -6,7 +6,7 @@ test('table chat, reactions, public meld inspection and saved table resume', asy
 }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const g = await setup(page, tableServer, 'complete');
-  await page.getByRole('button', { name: 'Inspect Akira melds' }).click();
+  await page.getByRole('button', { name: 'Inspect Akira tiles' }).locator('.avatar').click();
   await expect(page.locator('.player-meld-details section')).toHaveCount(3);
   await page.getByRole('button', { name: 'Close dialog' }).click();
   await page.getByRole('button', { name: 'Open table chat' }).click();
@@ -30,6 +30,37 @@ test('table chat, reactions, public meld inspection and saved table resume', asy
   await expect(page.locator('.game-window')).toBeVisible();
   expect(g.players[0].hand).toEqual(hand);
   await expect(page.locator('dialog')).not.toBeVisible();
+});
+test('the whole player card opens public tiles by mouse and keyboard', async ({
+  page,
+  tableServer,
+}) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await setup(page, tableServer, 'complete');
+  const mei = page.getByRole('button', { name: 'Inspect Mei tiles' });
+  await expect(mei).toHaveClass(/player-badge/);
+  // Click the seat wind, outside the player's name.
+  await mei.locator('.seat-wind').click();
+  await expect(page.locator('dialog h2')).toHaveText('Mei');
+  await expect(page.locator('.player-discards .tile')).toHaveCount(6);
+  await expect(page.locator('.player-discards .tile').first()).toHaveAttribute(
+    'data-tile-name',
+    '4 characters',
+  );
+  await expect(page.locator('dialog')).toContainText('No declared melds yet.');
+  await expect(page.locator('dialog .tile')).toHaveCount(6);
+  await page.keyboard.press('Escape');
+  const sora = page.getByRole('button', { name: 'Inspect Sora tiles' });
+  await sora.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('dialog h2')).toHaveText('Sora');
+  await expect(page.locator('.player-discards li')).toHaveCount(1);
+  await expect(page.locator('.player-discards li')).toContainText('Called');
+  await page.getByRole('button', { name: 'Close dialog' }).click();
+  await page.getByRole('button', { name: 'Inspect Akira tiles' }).focus();
+  await page.keyboard.press('Space');
+  await expect(page.locator('.player-meld-details section')).toHaveCount(3);
+  await expect(page.locator('.player-discards')).toContainText('No discards yet.');
 });
 test('queue discards privately, cancel, and send once when the selected tile becomes legal', async ({
   page,

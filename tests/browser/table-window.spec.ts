@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test';
-import { PerspectiveCamera, Vector3 } from 'three';
-import { tableFieldOfView } from '../../client/table-camera';
+import { tableProjection } from '../fixtures/table-view';
+import { tileName } from '../../shared/tiles';
 import { applyAction, gameView } from '../../server/engine';
 import { test, setup, order, inViewport } from '../fixtures/table';
 
@@ -276,16 +276,7 @@ test('3D face inspection names visible tiles and never reveals a concealed tile'
 }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const game = await setup(page, tableServer, 'complete');
-  const rect = (await page.locator('#live-table canvas').boundingBox())!;
-  const aspect = rect.width / rect.height;
-  const camera = new PerspectiveCamera(tableFieldOfView(aspect), aspect, 0.1, 100);
-  camera.position.set(0, 15, 12);
-  camera.lookAt(0, 0, 0.7);
-  camera.updateMatrixWorld();
-  const point = (x: number, z: number) => {
-    const v = new Vector3(x, 0.178, z).project(camera);
-    return { x: rect.x + ((v.x + 1) / 2) * rect.width, y: rect.y + ((1 - v.y) / 2) * rect.height };
-  };
+  const point = await tableProjection(page);
   // A face-up bonus away from the center's discard-ledger hit target.
   const visible = point(-0.48, 4.8);
   expect(await page.evaluate((p) => document.elementFromPoint(p.x, p.y)?.tagName, visible)).toBe(
@@ -295,6 +286,15 @@ test('3D face inspection names visible tiles and never reveals a concealed tile'
   await expect(page.getByRole('tooltip')).toHaveText('Chrysanthemum');
   await page.mouse.click(visible.x, visible.y);
   await expect(page.getByRole('tooltip')).toHaveText('Chrysanthemum');
+  // Every local tile must also exist on the board, outside the HTML input rack.
+  for (const [i, tile] of game.players[0].hand.entries()) {
+    const own = point((i - (game.players[0].hand.length - 1) / 2) * 0.32, 5.46);
+    expect(await page.evaluate((p) => document.elementFromPoint(p.x, p.y)?.tagName, own)).toBe(
+      'CANVAS',
+    );
+    await page.mouse.move(own.x, own.y);
+    await expect(page.getByRole('tooltip')).toHaveText(tileName(tile));
+  }
   // Right-hand seat, away from the HTML seat badges. The server has private tiles here.
   expect(game.players[1].hand.length).toBe(13);
   const hidden = point(5.46, 1.92);

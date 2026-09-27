@@ -16,7 +16,11 @@
 - **Chat** opens table or lobby/session messages and emoji reactions. Channels retain the last
   100 messages on the server. Text is escaped, messages have a 300-character limit, reactions
   use a fixed list, and sends are limited per profile.
-- Click a player's name to inspect declared melds and bonus tiles.
+- Click or tap anywhere on a player's card (avatar, name, points, or seat wind) to inspect
+  declared melds, bonus tiles, and numbered discards in play order. Called and Riichi discards
+  have text labels. Keyboard users can focus the card and press Enter or Space.
+- All four hands appear on the board after setup. Your row shows your own tile faces; opponents
+  show backs. Use the larger rack below the board to select, arrange, and discard your tiles.
 - **Queue discards** enters selection mode. Pick physical tiles in order, then click
   **Selecting discards** to arm the queue. Remove individual tiles or use **Clear** to cancel.
   Legal wins and kongs pause it; unavailable tiles are removed. An illegal first choice waits

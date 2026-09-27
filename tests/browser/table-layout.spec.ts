@@ -14,12 +14,12 @@ for (const viewport of [
   { width: 844, height: 390 },
   { width: 320, height: 568 },
 ]) {
-  test(`opponent hands and player cards stay unobstructed at ${viewport.width}×${viewport.height}`, async ({
+  test(`all four hands and player cards stay unobstructed at ${viewport.width}×${viewport.height}`, async ({
     page,
     tableServer,
   }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await setup(page, tableServer, 'complete');
+    const game = await setup(page, tableServer, 'complete');
     // Browser zoom changes the CSS viewport after the table is already mounted.
     await page.setViewportSize(viewport);
     await page.evaluate(
@@ -38,10 +38,11 @@ for (const viewport of [
     camera.position.set(0, 15, 12);
     camera.lookAt(0, 0, 0.7);
     camera.updateMatrixWorld();
-    // Test every opponent tile, not just the center of a hand. These are public backs.
-    for (const seat of [1, 2, 3]) {
-      for (let i = 0; i < 13; i++) {
-        const tile = seatPoint((i - 6) * 0.32, 5.46, seat);
+    // Check every tile in all four hands, including the viewer's restored board row.
+    for (const seat of [0, 1, 2, 3]) {
+      const count = game.players[seat].hand.length;
+      for (let i = 0; i < count; i++) {
+        const tile = seatPoint((i - (count - 1) / 2) * 0.32, 5.46, seat);
         const point = new Vector3(tile.x, 0.178, tile.z).project(camera);
         const screen = {
           x: canvas.x + ((point.x + 1) * canvas.width) / 2,

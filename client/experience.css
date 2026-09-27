@@ -41,9 +41,7 @@
   gap: 12px;
   margin: 18px 0;
 }
-.player-name-button {
-  background: none;
-  border: 0;
+.player-name {
   color: inherit;
   font-size: inherit;
   font-weight: 600;
@@ -52,13 +50,9 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   padding: 0;
-  cursor: pointer;
   text-align: left;
 }
-.player-name-button:hover {
-  text-decoration: underline;
-}
-.player-name-button em {
+.player-name em {
   font-size: 10px;
   color: var(--muted);
 }
@@ -75,6 +69,28 @@
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
+}
+.player-discards {
+  margin-top: 24px;
+  border-top: 1px solid var(--line);
+}
+.player-discards ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 0;
+  list-style: none;
+}
+.player-discards li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+.player-discards li small {
+  max-width: 64px;
+  text-align: center;
 }
 .tile-back {
   display: inline-block;
@@ -584,7 +600,7 @@ body[data-environment='rain'] .lotus > i {
     bottom: 12px;
     max-height: calc(100dvh - 80px);
   }
-  .player-name-button {
+  .player-name {
     max-width: 95px;
     font-size: 11px;
   }
@@ -647,8 +663,19 @@ body[data-environment='rain'] .lotus > i {
     opacity: 1;
   }
 }
-.game-window .player-name-button {
+.game-window button.player-badge {
   pointer-events: auto;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+.game-window button.player-badge:hover,
+.game-window button.player-badge:focus-visible {
+  border-color: var(--accent);
+}
+.game-window button.player-badge:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
 .rain-drops {
   position: absolute;
