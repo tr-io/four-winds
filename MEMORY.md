@@ -25,11 +25,21 @@ before relying on the snapshot. Start with the user's latest request.
    `npm run test:load` uses isolated temporary storage; the documented history test intentionally
    reproduces the outstanding bottleneck. Existing production Compose must be updated on-host
    to enable the forwarded-client-address fix; image releases do not replace that file.
-   Verification: 100 unit/network, 41 desktop, 14 mobile, 5 deployment tests passed, with types,
+   Verification: 100 unit/network, 47 desktop, 16 mobile, 5 deployment tests passed, with types,
    build, formatting and Compose validation. Worker failure/retry and production CSP checks
    also pass. Load results are recorded in the audit; private scratch profiles are ignored.
    The prior tile/card fixes remain: all four board hands render (own faces, opponent backs), and
    clicking the whole player card opens public melds, bonuses, and numbered discards.
+   Follow-up on the same PR: the opening title now finishes before recorded dice throws and
+   dealing, using shared timings for CSS, tile flights, and audio. Reduced motion uses a static
+   summary. Added independent local zoom opt-in (wheel/pinch and keyboard/touch buttons), camera
+   distance limits, and Reset view. Server snapshots preserve the enabled local camera; opponent
+   faces remain absent. Existing flower/rain/pond interactions were verified. The requested
+   postgame logs, saved-table prompt, and hidden-tab notifications were already implemented;
+   profiles use localStorage credentials with server-side histories, not identity cookies.
+   Opening-order regression failed before the fix and now passes for MCR, Riichi, Singapore,
+   and legacy hands without setup metadata. Camera tests cover wheel, Android pinch, touch
+   buttons, bounds, reset, preference persistence, and unchanged authoritative state.
 2. **How to play** is now an interactive page with preset switching, tile explanations, a moving
    turn walkthrough, hand grouping/checking, and competing-claim examples. `server/lessons.ts`
    validates separate preset examples through the existing engine in isolated games; scoring,
@@ -114,8 +124,9 @@ Important implementation details:
 - `nextHandSeconds`, `advanceWhenReady`, and `hostCanAdvance` are server-enforced, with defaults
   60/true/true. Zero disables the timer; all three mechanisms cannot be disabled together.
   Old saved rules get defaults on load. Ready/force commands carry the current decision ID.
-- `client/deal-sequence.ts` coordinates the 2.3-second opening with `table.ts`, `table-effects.ts`,
-  and `game-audio.ts`. Repeated snapshots and reloads must not replay the deal. Mobile WebKit
+- `client/deal-sequence.ts` coordinates the title → optional recorded dice throws → dealing
+  stages with `table.ts`, `table-effects.ts`, and `game-audio.ts`. Repeated snapshots and reloads
+  must not replay the deal. Mobile WebKit
   tooltips show after a tap finishes; touch `pointerout` previously hid them immediately.
 - `RoomSummary.online` counts connected humans; `phase` describes waiting/playing/results.
   `client/main.ts` separates live and saved rows. The engine pauses when no humans are connected.

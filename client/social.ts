@@ -77,7 +77,12 @@ export class SocialUI {
   }
   private applyPreferences() {
     document.body.dataset.environment = this.preferences.environment;
-    this.getTable()?.setRotation(this.preferences.rotate);
+    this.getTable()?.setViewControls(this.preferences.rotate, this.preferences.zoom);
+    document
+      .querySelectorAll<HTMLButtonElement>('[data-social="zoom-in"], [data-social="zoom-out"]')
+      .forEach((button) => {
+        button.disabled = !this.preferences.zoom;
+      });
     this.ambient.configure(
       !!this.state?.room && this.preferences.ambient,
       this.preferences.environment,
@@ -86,7 +91,7 @@ export class SocialUI {
   }
   settingsHTML() {
     const p = this.preferences;
-    return `<section class="personal-settings"><h3>A little room to breathe.</h3><label>Surroundings<select data-preference="environment"><option value="garden" ${p.environment === 'garden' ? 'selected' : ''}>Bamboo garden · birds</option><option value="rain" ${p.environment === 'rain' ? 'selected' : ''}>Rain pavilion · rainfall</option><option value="pond" ${p.environment === 'pond' ? 'selected' : ''}>Lotus pond · water</option></select></label><label><input type="checkbox" data-preference="ambient" ${p.ambient ? 'checked' : ''}/> Ambient sound</label><label>Ambient volume<input type="range" min="0" max="100" value="${p.volume * 100}" data-preference="volume"/></label><label><input type="checkbox" data-preference="rotate" ${p.rotate ? 'checked' : ''}/> Drag to rotate the board · right-drag to pan</label><button type="button" class="text-button" data-social="reset-view">Reset board view</button><label><input type="checkbox" data-preference="notifications" ${p.notifications ? 'checked' : ''}/> Browser turn notifications</label><small>Notifications arrive while this tab is hidden. Preferences stay in this browser.</small></section>`;
+    return `<section class="personal-settings"><h3>A little room to breathe.</h3><label>Surroundings<select data-preference="environment"><option value="garden" ${p.environment === 'garden' ? 'selected' : ''}>Bamboo garden · birds</option><option value="rain" ${p.environment === 'rain' ? 'selected' : ''}>Rain pavilion · rainfall</option><option value="pond" ${p.environment === 'pond' ? 'selected' : ''}>Lotus pond · water</option></select></label><label><input type="checkbox" data-preference="ambient" ${p.ambient ? 'checked' : ''}/> Ambient sound</label><label>Ambient volume<input type="range" min="0" max="100" value="${p.volume * 100}" data-preference="volume"/></label><label><input type="checkbox" data-preference="rotate" ${p.rotate ? 'checked' : ''}/> Drag to rotate the board · right-drag to pan</label><label><input type="checkbox" data-preference="zoom" ${p.zoom ? 'checked' : ''}/> Scroll or pinch to zoom the board</label><div class="board-view-buttons"><button type="button" class="text-button" data-social="zoom-in" ${p.zoom ? '' : 'disabled'}>Zoom in</button><button type="button" class="text-button" data-social="zoom-out" ${p.zoom ? '' : 'disabled'}>Zoom out</button><button type="button" class="text-button" data-social="reset-view">Reset board view</button></div><label><input type="checkbox" data-preference="notifications" ${p.notifications ? 'checked' : ''}/> Browser turn notifications</label><small>Notifications arrive while this tab is hidden. Preferences stay in this browser.</small></section>`;
   }
   private change = async (e: Event) => {
     const input = e.target as HTMLInputElement;
@@ -117,7 +122,7 @@ export class SocialUI {
     if (key === 'volume') this.preferences.volume = Number(input.value) / 100;
     else if (key === 'environment' && ['garden', 'rain', 'pond'].includes(input.value))
       this.preferences.environment = input.value as LocalPreferences['environment'];
-    else if (key === 'rotate' || key === 'ambient' || key === 'notifications')
+    else if (key === 'rotate' || key === 'zoom' || key === 'ambient' || key === 'notifications')
       this.preferences[key] = input.checked;
     savePreferences(this.player, this.preferences);
     this.applyPreferences();
@@ -341,6 +346,12 @@ export class SocialUI {
         case 'clear-queue':
           this.queue = [];
           this.renderQueue();
+          break;
+        case 'zoom-in':
+          this.getTable()?.zoomBy(0.85);
+          break;
+        case 'zoom-out':
+          this.getTable()?.zoomBy(1 / 0.85);
           break;
         case 'reset-view':
           this.getTable()?.resetView();

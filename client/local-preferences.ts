@@ -1,6 +1,7 @@
 export type Environment = 'garden' | 'rain' | 'pond';
 export type LocalPreferences = {
   rotate: boolean;
+  zoom: boolean;
   notifications: boolean;
   ambient: boolean;
   volume: number;
@@ -8,6 +9,7 @@ export type LocalPreferences = {
 };
 const defaults: LocalPreferences = {
   rotate: false,
+  zoom: false,
   notifications: false,
   ambient: false,
   volume: 0.3,
@@ -18,6 +20,7 @@ export function readPreferences(player: string): LocalPreferences {
     const p = JSON.parse(localStorage.getItem(`four-winds-preferences:${player}`) ?? '{}');
     return {
       rotate: p.rotate === true,
+      zoom: p.zoom === true,
       notifications: p.notifications === true,
       ambient: p.ambient === true,
       volume:

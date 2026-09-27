@@ -1,12 +1,17 @@
 import type { GameView } from '../shared/types';
 
-// One clock shared by the table, cut-in, and synthesized tile clacks (milliseconds).
-export const DEAL = { shuffle: 1800, assemble: 300, packet: 80, flight: 300, duration: 3700 };
-export const dealTileDelay = (seat: number, index: number, dealer: number) =>
-  DEAL.shuffle +
-  DEAL.assemble +
-  (Math.floor(index / 4) * 4 + ((seat - dealer + 4) % 4)) * DEAL.packet +
-  (index % 4) * 14;
+// Shared stage boundaries for the opening title, dice, 3D packets, and tile clacks.
+export const DEAL = { intro: 1200, roll: 800, assemble: 300, packet: 80, flight: 300 };
+export function dealSequence(game?: Pick<GameView, 'setup'>) {
+  const rolls = game?.setup?.dice.length ?? 0;
+  const packets = Math.ceil((game?.setup?.deal.length ?? 53) / 4);
+  const diceDuration = rolls * DEAL.roll;
+  const assembleAt = DEAL.intro + diceDuration;
+  const tilesAt = assembleAt + DEAL.assemble;
+  const duration = tilesAt + Math.max(0, packets - 1) * DEAL.packet + DEAL.flight + 100;
+  return { rolls, packets, diceDuration, assembleAt, tilesAt, duration };
+}
+export type DealSequence = ReturnType<typeof dealSequence>;
 
 export function freshDealKey(room: string, game: GameView, serverTime: number): string | null {
   if (game.phase !== 'playing' || game.players.some((p) => p.hasDiscarded || p.melds.length))

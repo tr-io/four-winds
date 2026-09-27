@@ -32,7 +32,7 @@ import { tileStatic } from './tile-art';
 import { HandRack } from './hand-rack';
 import { summarizeDiscards } from './discards';
 import { TableEffects } from './table-effects';
-import { freshDealKey } from './deal-sequence';
+import { freshDealKey, dealSequence } from './deal-sequence';
 import { installTileTooltips, hideTileTooltip } from './tile-tooltip';
 import { GameAudio, type SoundCue } from './game-audio';
 import { handInsight } from './hand-insight';
@@ -225,7 +225,7 @@ socket.on('state', (next: AppState) => {
       sessionStorage.setItem('four-winds-last-deal', dealKey);
       table?.deal(g);
       effects?.deal(g);
-      tone('start');
+      gameAudio.play('start', dealSequence(g));
     }
     if (!g.result && activeDialog === 'result') closeDialog();
     const eventKey = `${state.room!.code}:${g.handNumber}`;

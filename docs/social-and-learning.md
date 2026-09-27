@@ -26,14 +26,18 @@
   Legal wins and kongs pause it; unavailable tiles are removed. An illegal first choice waits
   rather than skipping to a different tile. Queues clear on disconnect, reload or a new hand.
 - **Table settings** contains themes, garden/rain/pond surroundings, ambient audio and volume,
-  board rotation, and turn notifications. Ambient audio is synthesized locally. Tap the lotus
+  board rotation, zoom, and turn notifications. Ambient audio is synthesized locally. Tap the lotus
   to open its petals; the rain setting also drops water from the leaves. Reduced motion removes
-  moving effects. Rotation and right-drag panning are local; opponent concealed faces are never
-  created, even when completed-hand information is available in the result dialog.
+  moving effects. Enable **Scroll or pinch to zoom the board** for bounded wheel/pinch zoom,
+  or use **Zoom in / Zoom out** with keyboard or touch. Zoom and rotation can be enabled
+  independently; **Reset board view** restores the default camera. Preferences survive reloads.
+  Rotation, panning, and zoom are local; opponent concealed faces are never created, even when
+  completed-hand information is available in the result dialog.
 - Notifications require browser permission and a browser that supports the Notification
   constructor. They are emitted only for new decisions while the page is hidden and do not work
   after the page is closed. Some mobile browsers only support service-worker notifications;
   that background delivery is outside this implementation.
+- Expand **Full hand log** in the postgame result for every public event and score transfer.
 - **Profile** offers DiceBear avatars, **Hand history**, and **Saved tables**. The latest 100
   completed hands retain all public events and each score transfer. Archive reads require the
   matching profile. Full historical logs from earlier builds cannot be reconstructed.
@@ -53,6 +57,12 @@ physical tile IDs and wall order remain on the server. Lesson endpoints operate 
 validated examples and do not reveal live game state.
 
 ## Setup conventions
+
+The opening title plays first (1.2 seconds), followed by the recorded dice throws (0.8 seconds
+each), then dealing. MCR shows two throws; Riichi and Singapore show one. Older saved hands
+without dice metadata skip that stage. Tile flights and their sounds use the same stage
+boundaries. Reduced motion shows a brief static setup summary, with the rack and actions
+immediately usable. Repeated snapshots and reloading do not replay the opening.
 
 The [requested MCR guide](https://mahjongpros.com/blogs/mahjong-rules-and-scoring-tables/official-chinese-mcr-mahjong-rules)
 specifies two throws of two dice, a wall selected by the first sum, and a stack break using
@@ -79,7 +89,7 @@ metadata; games saved by older builds use a sequential neutral wall until the ne
 
 ## Assets and attribution
 
-Avatars are generated locally from DiceBear 9.4.2 packages. No avatar API request or user
+Avatars are generated locally from DiceBear 9.4.3 packages. No avatar API request or user
 uploaded image is used. Adventurer and Adventurer Neutral are by Lisa Wischofsky under
 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Bottts is by Pablo Stanley and is
 free for personal and commercial use. The profile picker links DiceBear, the style pages,

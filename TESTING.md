@@ -215,3 +215,12 @@ hidden tab should mute ambience. These depend on browser permissions and audio o
 See the [capacity audit](docs/capacity-audit.md) for workload controls, acceptance thresholds,
 measurements, and the known failure with retained hand histories. Keep load tests on isolated
 staging or local services. The [architecture guide](docs/architecture.md) explains the data flow.
+
+### Opening sequence and board view
+
+Start a fresh hand: the opening title finishes before the dice appear, and dealing follows the
+recorded throws. Check both normal and reduced motion. Under **Table settings**, enable
+**Scroll or pinch to zoom the board**; try the wheel, pinch, Zoom in/out buttons, and Reset view.
+Rotation and zoom have separate local switches. Game updates should preserve the camera, and
+opponent concealed faces should remain hidden. Tap/click the lotus, or focus it and press Enter,
+to see petals, rain droplets, or pond rings for the selected surroundings.

@@ -1,4 +1,4 @@
-import { DEAL } from './deal-sequence';
+import { DEAL, dealSequence, type DealSequence } from './deal-sequence';
 export type SoundCue = 'tick' | 'draw' | 'discard' | 'claim' | 'win' | 'bonus' | 'start';
 
 // Synthesized locally: a dry tile click, taiko-like call impact, and a rising victory chord.
@@ -18,7 +18,7 @@ export class GameAudio {
         0.015,
       );
   }
-  play(cue: SoundCue) {
+  play(cue: SoundCue, sequence: DealSequence = dealSequence()) {
     if (!this.enabled) return;
     this.context ??= new AudioContext();
     const c = this.context;
@@ -81,24 +81,30 @@ export class GameAudio {
       };
     };
     if (cue === 'start') {
-      // Dense ceramic chatter gives way to sixteen four-tile dealing packets.
+      // Shuffle chatter, recorded dice throws, then the actual number of dealing packets.
       for (let i = 0; i < 22; i++) {
-        const delay = (i * DEAL.shuffle) / 22 / 1000;
+        const delay = (i * DEAL.intro) / 22 / 1000;
         rush(0.038, 1900 + ((i * 173) % 1700), 0.24, delay);
         note(820 + ((i * 137) % 660), delay, 0.045, 0.17, 420);
       }
-      rush(0.22, 1600, 0.32, DEAL.shuffle / 1000);
-      note(125, DEAL.shuffle / 1000, 0.24, 0.5, 60);
-      for (let packet = 0; packet < 16; packet++) {
-        const delay = (DEAL.shuffle + DEAL.assemble + packet * DEAL.packet) / 1000;
+      for (let roll = 0; roll < sequence.rolls; roll++)
+        for (let bounce = 0; bounce < 3; bounce++) {
+          const delay = (DEAL.intro + roll * DEAL.roll + bounce * 140) / 1000;
+          rush(0.04, 2400, 0.18, delay);
+          note(950, delay, 0.04, 0.12, 600);
+        }
+      rush(0.22, 1600, 0.32, sequence.assembleAt / 1000);
+      note(125, sequence.assembleAt / 1000, 0.24, 0.5, 60);
+      for (let packet = 0; packet < sequence.packets; packet++) {
+        const delay = (sequence.tilesAt + packet * DEAL.packet) / 1000;
         for (let tile = 0; tile < 3; tile++) {
           const landing = delay + DEAL.flight / 1000 + tile * 0.014;
           rush(0.025, 3000, 0.12, landing);
           note(1100 + (packet % 4) * 160, landing, 0.045, 0.2, 680);
         }
       }
-      note(587.33, 2.15, 0.25, 0.15, 587.33, 'triangle');
-      note(880, 2.2, 0.25, 0.12);
+      note(587.33, (sequence.duration - 300) / 1000, 0.25, 0.15, 587.33, 'triangle');
+      note(880, (sequence.duration - 250) / 1000, 0.25, 0.12);
     } else if (cue === 'win') {
       rush(0.7, 2800, 0.7);
       note(150, 0, 0.6, 1, 42);

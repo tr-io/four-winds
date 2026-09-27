@@ -1,3 +1,4 @@
+import { preserveTableFrames, tableFrame } from '../fixtures/table-view';
 import { expect } from '@playwright/test';
 import { test, setup } from '../fixtures/table';
 test('table chat, reactions, public meld inspection and saved table resume', async ({
@@ -157,4 +158,84 @@ test('turn notifications are opt-in, background-only and deduplicated per decisi
   await expect.poll(count).toBe(1);
   tableServer.service.broadcast();
   await expect.poll(count).toBe(1);
+});
+
+test('optional wheel and button zoom is bounded, persists, and leaves game state private', async ({
+  page,
+  tableServer,
+}) => {
+  await preserveTableFrames(page);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const g = await setup(page, tableServer, 'complete');
+  const before = JSON.stringify(g);
+  const canvas = page.locator('#live-table canvas');
+  const picture = () => tableFrame(page);
+  const original = await picture();
+  const settings = () => page.getByRole('button', { name: 'Table settings', exact: true }).click();
+  const close = () => page.getByRole('button', { name: 'Close dialog' }).click();
+  await settings();
+  await expect(page.getByRole('button', { name: 'Zoom in', exact: true })).toBeDisabled();
+  await page.getByLabel('Scroll or pinch to zoom').check();
+  await expect(page.getByLabel('Drag to rotate')).not.toBeChecked();
+  await close();
+  const rect = (await canvas.boundingBox())!;
+  await page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2);
+  await page.mouse.wheel(0, -450);
+  const wheeled = await picture();
+  expect(wheeled === original).toBe(false);
+  // Regular server snapshots must preserve the local camera.
+  tableServer.service.broadcast();
+  await expect.poll(async () => (await picture()) === wheeled).toBe(true);
+  await settings();
+  for (let i = 0; i < 10; i++)
+    await page.getByRole('button', { name: 'Zoom in', exact: true }).click();
+  await close();
+  const nearest = await picture();
+  await settings();
+  await page.getByRole('button', { name: 'Zoom in', exact: true }).click();
+  await close();
+  expect((await picture()) === nearest).toBe(true);
+  await settings();
+  for (let i = 0; i < 12; i++)
+    await page.getByRole('button', { name: 'Zoom out', exact: true }).click();
+  await close();
+  const farthest = await picture();
+  expect(farthest === nearest).toBe(false);
+  await settings();
+  await page.getByRole('button', { name: 'Zoom out', exact: true }).click();
+  await close();
+  expect((await picture()) === farthest).toBe(true);
+  await settings();
+  await page.getByRole('button', { name: 'Reset board view' }).click();
+  await close();
+  expect((await picture()) === original).toBe(true);
+  expect(JSON.stringify(g)).toBe(before);
+  await page.reload();
+  await settings();
+  await expect(page.getByLabel('Scroll or pinch to zoom')).toBeChecked();
+  await page.getByLabel('Scroll or pinch to zoom').uncheck();
+  await expect(page.getByRole('button', { name: 'Zoom in', exact: true })).toBeDisabled();
+});
+
+test('background flowers respond to keyboard and pointer input in each environment', async ({
+  page,
+  tableServer,
+}) => {
+  await setup(page, tableServer, 'complete');
+  for (const environment of ['garden', 'rain', 'pond']) {
+    await page.getByRole('button', { name: 'Table settings', exact: true }).click();
+    await page.getByLabel('Surroundings').selectOption(environment);
+    await page.getByRole('button', { name: 'Close dialog' }).click();
+    const lotus = page.getByRole('button', { name: 'Touch the lotus to make it bloom' });
+    if (environment === 'garden') {
+      await lotus.focus();
+      await page.keyboard.press('Enter');
+    } else await lotus.click();
+    await expect(page.locator('.zen-garden')).toHaveClass(/blooming/);
+    await expect(page.locator('.lotus > i').first()).toHaveCSS('scale', '1.15');
+    if (environment === 'rain')
+      await expect(page.locator('.rain-drops i').first()).toHaveCSS('animation-name', 'leaf-drop');
+    if (environment === 'pond')
+      await expect(page.locator('.water-rings i').first()).toHaveCSS('animation-name', 'pond-ring');
+  }
 });

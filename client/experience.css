@@ -528,10 +528,11 @@ body[data-environment='rain'] .lotus > i {
   background: #10281bed;
   border: 1px solid #809b6e;
   color: #e5edd7;
-  animation: dice-caption 3.7s both;
+  animation: dice-caption var(--dice-duration) var(--intro) both;
 }
 .dice-throw {
   text-align: center;
+  animation: dice-reveal 1ms calc(var(--intro) + var(--throw) * var(--roll)) steps(1) both;
 }
 .dice-throw small {
   font-size: 10px;
@@ -549,7 +550,7 @@ body[data-environment='rain'] .lotus > i {
   color: #f2e6c6;
   line-height: 1;
   display: inline-block;
-  animation: dice-roll 0.7s calc(var(--throw) * 0.8s) both;
+  animation: dice-roll 0.7s calc(var(--intro) + var(--throw) * var(--roll)) both;
 }
 .dice-throw b {
   font-size: 14px;
@@ -559,9 +560,6 @@ body[data-environment='rain'] .lotus > i {
   text-align: center;
   font-size: 11px;
   margin: 0;
-}
-.setup-dice ~ .deal-caption {
-  display: none;
 }
 @keyframes dice-roll {
   0% {
@@ -577,18 +575,27 @@ body[data-environment='rain'] .lotus > i {
     transform: translateY(0) rotate(0);
   }
 }
+@keyframes dice-reveal {
+  from {
+    visibility: hidden;
+  }
+  to {
+    visibility: visible;
+  }
+}
 @keyframes dice-caption {
-  0%,
-  5% {
+  0% {
     opacity: 0;
+    visibility: hidden;
   }
-  12%,
-  65% {
+  8%,
+  80% {
     opacity: 1;
+    visibility: visible;
   }
-  90%,
   100% {
     opacity: 0;
+    visibility: hidden;
   }
 }
 @media (max-width: 700px) {
@@ -649,6 +656,7 @@ body[data-environment='rain'] .lotus > i {
 @media (prefers-reduced-motion: reduce) {
   .reaction-bubble,
   .rolling-die,
+  .dice-throw,
   .setup-dice,
   .blooming .water-rings i {
     animation: none;
@@ -661,6 +669,7 @@ body[data-environment='rain'] .lotus > i {
   }
   .setup-dice {
     opacity: 1;
+    visibility: visible;
   }
 }
 .game-window button.player-badge {
@@ -726,22 +735,9 @@ body[data-environment='rain'] .blooming .rain-drops i {
 .game-window .player-arrival::before {
   pointer-events: none;
 }
-.game-window .deal-effect,
-.game-window .deal-halo {
-  animation-duration: 3.7s;
-}
-.game-window .deal-effect:has(.setup-dice) .deal-caption {
-  align-self: end;
-  margin-bottom: 15px;
-  padding: 8px 28px;
-}
-.game-window .deal-effect:has(.setup-dice) .deal-caption strong {
-  font-size: 17px;
-}
-.game-window .deal-effect:has(.setup-dice) .deal-winds {
-  display: none;
-}
-.game-window .shuffle-label,
-.game-window .deal-label {
-  animation-duration: 2.1s;
+
+.board-view-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
