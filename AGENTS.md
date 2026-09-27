@@ -4,8 +4,9 @@ Read [MEMORY.md](MEMORY.md) when starting or resuming work for the current hando
 verification status, and next steps. Update that handoff after meaningful changes or discoveries.
 
 For new implementation work, create a feature branch and open a pull request. For follow-up work,
-reuse the active feature branch and PR recorded in [MEMORY.md](MEMORY.md), unless the user requests
-a separate branch. Commit and push completed changes to that branch.
+check the status of the active PR recorded in [MEMORY.md](MEMORY.md). Reuse its branch while the PR
+is open, unless the user requests a separate branch. If the PR is merged or closed, create a new
+branch from the latest `origin/main` and open a new PR. Commit and push completed changes to that branch.
 Keep `main` unchanged; merge through PR review when the user authorizes it.
 
 The inherited user instructions reference `@RTK.md`. Read and follow that file when available;

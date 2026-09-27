@@ -5,9 +5,11 @@ before relying on the snapshot. Start with the user's latest request.
 
 ## Resume here
 
-1. Continue on **`feat/social-table-experience`**, [PR #2](https://github.com/tr-io/four-winds/pull/2).
-   The user explicitly requested staying on this feature branch. [PR #3](https://github.com/tr-io/four-winds/pull/3)
-   was merged into it as `f8859c3`; PR #2 remains open and main is unchanged.
+1. Current documentation work is on **`docs/agent-workflow-handoff`**, based on `origin/main` at
+   `c21f804`. The user merged [PR #2](https://github.com/tr-io/four-winds/pull/2), including the
+   application, dependency, and test-fixture fixes through `5234e0d`. [PR #3](https://github.com/tr-io/four-winds/pull/3)
+   was already included. The user requested a new PR for the remaining `AGENTS.md` and `MEMORY.md`
+   updates. Follow-up work reuses a branch only while its PR is open; check GitHub before continuing.
    The top opponent hand was rendered but covered by its player card. Short
    viewports also overlapped seat cards with recent actions and clipped the discard ledger.
    `client/table-viewport.css` now reserves room around the canvas, and `table-camera.ts` fits
