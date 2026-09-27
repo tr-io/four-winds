@@ -143,7 +143,15 @@ sudo dpkg-reconfigure --priority=low unattended-upgrades
 ```
 
 Keep your administrator's personal key separate from the CI key. Check that another new
-`fwadmin` session still works. Retain DigitalOcean console access for recovery.
+`fwadmin` session still works.
+
+DigitalOcean's **Web Console uses SSH**, so `PermitRootLogin no` also blocks its `root` login.
+Use `fwadmin` for the Web Console. If its URL contains `os_user=root`, try changing that to
+`os_user=fwadmin` and reload. Keep root SSH disabled. For recovery when SSH is unavailable, use
+the separate **Recovery Console** under the Droplet's Settings; log in with `fwadmin` and the
+password set by `adduser`. This console works independently of SSH.
+[Web Console](https://docs.digitalocean.com/products/droplets/how-to/connect-with-console/),
+[Recovery Console](https://docs.digitalocean.com/products/droplets/how-to/recovery/recovery-console/)
 
 Install Docker Engine and Compose from Docker's official Ubuntu repository:
 
@@ -252,7 +260,8 @@ add these **environment secrets**:
 | `DEPLOY_SSH_KEY`     | Entire contents of `~/.ssh/four-winds-ci`, including BEGIN/END lines |
 | `DEPLOY_KNOWN_HOSTS` | Trusted host-key line for the exact `DEPLOY_HOST`                    |
 
-For the trusted host-key line, use DigitalOcean's authenticated console to run:
+For the trusted host-key line, use DigitalOcean's authenticated Web Console **as `fwadmin`**
+(see section 2), or an SSH session whose host key you already verified. Run:
 
 ```sh
 cat /etc/ssh/ssh_host_ed25519_key.pub

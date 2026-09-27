@@ -10,8 +10,9 @@ before relying on the snapshot. Start with the user's latest request.
 2. Check GitHub Actions for the latest commit. The full workflow for **`48bd23c` passed**;
    the workflow for **`5da0447` was still running** when this handoff was written.
 3. Feature requests through the saved-table fix are implemented. No feature task is currently
-   unfinished. The user has created a DigitalOcean Droplet and is setting up its administrator
-   account. Server setup and the first production release remain to be completed.
+   unfinished. The user is setting up GitHub deployment secrets for a DigitalOcean Droplet.
+   The current issue is Web Console authentication as `root` after disabling root SSH; use
+   `fwadmin`. Server setup and the first production release remain to be verified.
 4. Use the guides below for testing or deployment; keep saved games and browser identities intact.
 
 ## User preferences and decisions
@@ -119,10 +120,19 @@ still the separate restricted CI account. The conflict and replacement account's
 and SSH file permissions were verified in a disposable Ubuntu 24 container. Keep the original
 root session open until a second terminal verifies the new administrator's SSH and sudo access.
 
-The user still needs to finish server setup, verify DNS, install the restricted controller,
-configure registry access and GitHub's `production` environment secrets, then publish the first
-release. Production deployment remains unverified. Actual domain/IP/key values have not been
-supplied. Keep credentials out of the repository and memory.
+Further setup findings: the user's local `four-winds` SSH alias selects a custom personal key;
+connecting directly to the IP skips that alias. Use `ssh fwadmin@four-winds`. If `sudo` group
+membership changes, reconnect before testing `sudo -v`. DigitalOcean's regular Web Console
+uses SSH: the reported authentication error showed `os_user=root`, which is blocked by the
+guide's `PermitRootLogin no`. The guide now explains using `fwadmin` for Web Console access and
+the separate password-based Recovery Console when SSH is unavailable. The actual remote
+cause and successful Web Console login have not yet been verified.
+
+The user has supplied the deployment domain/IP in chat and prepared the installer command;
+installer success, DNS, registry access, and production deployment remain unverified. They are
+currently configuring GitHub's `production` environment secrets, including `DEPLOY_KNOWN_HOSTS`.
+The server's verified public host key is still needed. Keep credentials out of the repository
+and memory.
 
 ## Local environment notes
 
