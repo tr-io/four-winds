@@ -1,3 +1,4 @@
+import { DEAL } from './deal-sequence';
 const calls: Record<string, [string, string]> = {
   pung: ['碰', 'PUNG'],
   chow: ['吃', 'CHOW'],
@@ -12,6 +13,17 @@ export class TableEffects {
   private timer: ReturnType<typeof setTimeout> | undefined;
   private seen = '';
   constructor(private host: HTMLElement) {}
+  deal(hand: number) {
+    clearTimeout(this.timer);
+    const effect = document.createElement('div');
+    effect.className = 'deal-effect';
+    effect.dataset.effect = 'deal';
+    effect.setAttribute('role', 'status');
+    effect.setAttribute('aria-label', `Hand ${hand}. Shuffling and dealing tiles.`);
+    effect.innerHTML = `<div class="deal-halo" aria-hidden="true"></div><div class="deal-winds" aria-hidden="true"><i>東</i><i>南</i><i>西</i><i>北</i></div><div class="deal-caption"><small>HAND ${hand}</small><strong>THE WINDS GATHER</strong><span class="shuffle-label">SHUFFLE</span><span class="deal-label">DEAL · EAST BEGINS</span></div>`;
+    this.host.replaceChildren(effect);
+    this.timer = setTimeout(() => this.host.replaceChildren(), DEAL.duration);
+  }
   play(id: string, kind: string, player: string, detail: string) {
     if (id === this.seen) return;
     this.seen = id;

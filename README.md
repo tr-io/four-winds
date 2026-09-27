@@ -24,7 +24,7 @@ Open **http://localhost:3001**. `PORT` and `DATA_FILE` can override the server p
 
 ## Table controls
 
-The Three.js table, player panels, tile rack, claims, and timers share one game window. Drag tiles to reorder them, or focus a tile and use **Alt + Left/Right**. **Sort tiles** restores suit order. Hover, focus, or tap the center **Discards** seal for a sorted tile/count ledger. The toolbar opens the game log, table settings, and rules. Last-discard and last-turn bubbles retain the recent action. Hover or focus tiles for English names; tap on mobile. Select the meld meter to inspect your hand, exposed sets, suit counts, and pair candidates. Claim cut-ins and a separate mahjong celebration respect reduced-motion settings.
+The Three.js table, player panels, tile rack, claims, and timers share one game window. Drag tiles to reorder them, or focus a tile and use **Alt + Left/Right**. **Sort tiles** restores suit order, and each incoming tile automatically sorts the rack. Hover or focus the small **Discards** button beside the center river for a sorted tile/count ledger; click to pin or unpin it. The toolbar opens the game log, table settings, and rules. Last-discard and last-turn bubbles retain the recent action. Hover or focus tiles for English names; tap on mobile. Select the meld meter to inspect your hand and declared sets, then open **Winning routes** for suggested completions and server-calculated points. A shuffle-and-deal opening, claim cut-ins, and a separate mahjong celebration respect reduced-motion settings. Enable sound for synchronized tile clacks.
 
 A complete MCR hand still needs eight fan before flowers. Click its qualification badge for a server-calculated breakdown; use a saved house ruleset with a lower minimum for basic-hand play.
 
@@ -35,7 +35,7 @@ A complete MCR hand still needs eight fan before flowers. Click its qualificatio
 - Choose **Fill empty seats with bots** to start immediately. Otherwise, invite players and let the host start when all four seats are filled. The host can add bots in the waiting room.
 - A joining friend replaces the first bot seat and inherits its hand and score. A player who leaves is replaced by a bot.
 - Draws arrive automatically. Select a tile and press **Discard**. All available win and meld claims appear as buttons, including each legal chow sequence.
-- After a hand, review the score and choose **Ready for the next hand**. The table continues after everyone is ready or after 60 seconds. At match end, the host can start a rematch.
+- After a hand, review the score and choose **Ready for the next hand**. The result shows the entire winning hand with colored melds and tooltips, a ready count out of four, and the next-hand countdown. By default the table continues when everyone is ready or after 60 seconds; hosts can force the next hand. All three advance mechanisms are configurable before play. At match end, the host can start a rematch.
 
 The server validates every action. Higher-priority claims beat lower-priority claims; server receipt order breaks ties. One winning claim resolves each discard. The claim window and meld priorities are editable. A turn timeout automatically discards the drawn tile, or takes a legal win.
 
@@ -52,13 +52,16 @@ The ruleset editor changes actual legal actions, timing, winning thresholds, set
 ## Test and deploy
 
 - **[TESTING.md](TESTING.md)** — local setup, four players on one computer, phones on a LAN, remote groups, reconnects, bot takeover, and automated checks.
-- **[DEPLOYMENT.md](DEPLOYMENT.md)** — Docker, automatic HTTPS, origin restrictions, persistence, backups, and operating boundaries.
+- **[docs/game-state-testing.md](docs/game-state-testing.md)** — targeted commands and scenarios for starts, draws, claims, wins, exhaustion, scoring, and network state.
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** — DigitalOcean VPS, subdomain/HTTPS, restricted CI key, GitHub tagged releases, health checks, rollback, and backups.
 
 ```sh
 npm test
 npm run build
-npx playwright install chromium
+npx playwright install chromium webkit
 npm run test:e2e
+npm run test:mobile
+npm run test:deploy
 ```
 
 ## Project map

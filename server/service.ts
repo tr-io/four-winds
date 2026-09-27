@@ -5,12 +5,14 @@ import { Server, type Socket } from 'socket.io';
 import { z } from 'zod';
 import type { AppState, Profile, Room, Rules, Lobby, LobbyView } from '../shared/types';
 import { PRESETS, rulesSchema } from '../shared/rules';
+import { analyzeHand } from './hand-analysis';
 import {
   applyAction,
   botAction,
   event,
   gameView,
   newPlayer,
+  nextHand,
   publicPlayer,
   startGame,
   tickGame,
@@ -46,13 +48,16 @@ export class GameService {
       if (data.version !== 1) throw new Error('Unsupported saved state version.');
       for (const s of data.sessions) {
         s.lobby ??= 'FOURWN';
+        s.rulesets = s.rulesets.map((r) => rulesSchema.parse(r));
         this.sessions.set(s.tokenHash, s);
       }
       for (const l of data.lobbies ?? []) this.lobbies.set(l.code, l);
       for (const r of data.rooms) {
         r.lobby ??= 'FOURWN';
+        r.rules = rulesSchema.parse(r.rules);
         for (const p of r.players) if (!p.bot) p.connected = false;
         if (r.game) {
+          r.game.rules = rulesSchema.parse(r.game.rules);
           r.game.players = r.players;
           for (const p of r.players) if (!p.bot) p.connected = false;
         }
@@ -151,8 +156,10 @@ export class GameService {
         const response = { ok: true, ...result };
         seen.set(cmd.id, response);
         if (seen.size > 200) seen.delete(seen.keys().next().value!);
-        this.persist();
-        this.broadcast();
+        if (cmd.type !== 'analyze-hand') {
+          this.persist();
+          this.broadcast();
+        }
         reply(response);
       } catch (e) {
         this.broadcast();
@@ -342,11 +349,32 @@ export class GameService {
       r.game = startGame(r.rules, r.players, -1);
       return {};
     }
+    if (type === 'analyze-hand') {
+      const r = requireRoom();
+      if (!r.game) throw new Error('Deal a hand first.');
+      return {
+        analysis: analyzeHand(
+          r.game,
+          r.players.findIndex((p) => p.profile.id === s.profile.id),
+        ),
+      };
+    }
     if (type === 'ready') {
       const r = requireRoom();
       if (r.game?.phase !== 'ended') throw new Error('The next hand is not ready yet.');
+      const data = z.object({ decision: z.number().int() }).parse(input);
+      if (r.game.decision !== data.decision) throw new Error('That hand has already changed.');
       r.players.find((p) => p.profile.id === s.profile.id)!.ready = true;
       tickGame(r.game);
+      return {};
+    }
+    if (type === 'force-next-hand') {
+      const r = host();
+      if (r.game?.phase !== 'ended' || !r.game.rules.hostCanAdvance)
+        throw new Error('Host advance is unavailable for this hand.');
+      const data = z.object({ decision: z.number().int() }).parse(input);
+      if (r.game.decision !== data.decision) throw new Error('That hand has already changed.');
+      nextHand(r.game);
       return {};
     }
     if (type === 'action') {

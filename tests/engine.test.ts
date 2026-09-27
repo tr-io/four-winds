@@ -531,3 +531,46 @@ describe('replacement tiles, special wins, and match boundaries', () => {
     expect(() => nextHand(g, 2000)).toThrow();
   });
 });
+
+describe('configurable between-hand transitions', () => {
+  it('uses the configured countdown and advances once at its deadline', () => {
+    const g = fixture('singapore');
+    g.rules.nextHandSeconds = 17;
+    g.rules.advanceWhenReady = false;
+    g.players[0].hand = tiles('111222333m444p55s');
+    g.players[0].drawn = g.players[0].hand.at(-1)!;
+    applyAction(g, 0, g.decision, 'win', 1100);
+    expect(g.phase).toBe('ended');
+    expect(g.turnDeadline).toBe(18100);
+    tickGame(g, 18099);
+    expect(g.handNumber).toBe(1);
+    tickGame(g, 18100);
+    expect(g.handNumber).toBe(2);
+  });
+  it('can advance when ready with no clock, and rejects configurations that can never advance', () => {
+    const g = fixture('singapore');
+    g.rules.nextHandSeconds = 0;
+    g.players[0].hand = tiles('111222333m444p55s');
+    g.players[0].drawn = g.players[0].hand.at(-1)!;
+    applyAction(g, 0, g.decision, 'win', 1100);
+    expect(g.turnDeadline).toBe(0);
+    tickGame(g, 999999);
+    expect(g.handNumber).toBe(1);
+    g.players.forEach((p) => (p.ready = true));
+    tickGame(g, 999999);
+    expect(g.handNumber).toBe(2);
+    expect(
+      rulesSchema.safeParse({
+        ...PRESETS.mcr,
+        nextHandSeconds: 0,
+        advanceWhenReady: false,
+        hostCanAdvance: false,
+      }).success,
+    ).toBe(false);
+    const old = { ...PRESETS.mcr } as Record<string, unknown>;
+    delete old.nextHandSeconds;
+    delete old.advanceWhenReady;
+    delete old.hostCanAdvance;
+    expect(rulesSchema.parse(old).nextHandSeconds).toBe(60);
+  });
+});

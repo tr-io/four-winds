@@ -8,6 +8,7 @@ RUN npm run build && npm prune --omit=dev
 # tsx executes the TypeScript server; keep it in production dependencies.
 
 FROM node:24-alpine AS runtime
+LABEL io.four-winds.state-version="1" org.opencontainers.image.source="https://github.com/tr-io/four-winds"
 ENV NODE_ENV=production PORT=3001 DATA_FILE=/app/data/four-winds.json
 WORKDIR /app
 COPY --from=build --chown=node:node /app/package.json ./

@@ -5,6 +5,9 @@ export const ruleLabels: Partial<Record<keyof Rules, string>> = {
   rounds: 'Winds',
   claimSeconds: 'Claim clock',
   turnSeconds: 'Turn clock',
+  nextHandSeconds: 'Next hand clock',
+  advanceWhenReady: 'Advance when all ready',
+  hostCanAdvance: 'Host may advance',
   allowChow: 'Chow',
   allowKong: 'Kong',
   sevenPairs: 'Seven pairs',
@@ -66,6 +69,7 @@ export function ruleValue(rules: Rules, key: keyof Rules): string {
       'pung-first': 'Win › pung / kong › chow',
       'chow-first': 'Win › chow › pung / kong',
     }[rules.meldPriority];
+  if (key === 'nextHandSeconds') return value ? `${value}s` : 'Off';
   if (key === 'claimSeconds' || key === 'turnSeconds') return `${value}s`;
   if (key === 'minimum')
     return `${value} ${rules.preset === 'mcr' ? 'fan' : rules.preset === 'riichi' ? 'han' : 'tai'}`;

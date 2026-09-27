@@ -19,28 +19,29 @@ Use a recent Chrome, Firefox, Safari, or Edge. WebGL renders the table; the hand
 
 1. Open your profile in the top right. Choose a name and color.
 2. Select **Play with bots**, choose a ruleset, and select **Take your seat**.
-3. Watch the table and seat entrance animations. Reduced-motion preferences disable them.
+3. Watch the table and seat entrance animations. To hear the opening, create a waiting table, enable the speaker, fill the seats with bots, then start. Tiles mix at the center, form the wall, and fly to the four seats with shuffle/deal clacks. Reduced motion replaces movement with a static hand announcement.
 4. The table fills one game window. Select a tile in the rack, then press **Discard** in the action dock above it. Bots draw, discard, call, and win through the same legal-action engine as humans.
 5. When a discard is claimable, use the **Mahjong / Ron**, **Pong / Pon**, **Kong / Kan**, or **Chow / Chi** buttons in that dock. A different button is shown for each legal chow sequence. The offered tile, countdown, and pending/received status remain visible without scrolling the page.
-6. Review a hand's scoring breakdown, then select **Ready for the next hand**.
+6. Review the full winning hand and scoring breakdown, then select **Ready**. The ready count, next-hand clock, and host's **Start next hand** control stay visible.
 7. Try all three presets. Singapore exposes flowers and animals and draws replacements automatically.
 
 ### Configure a table before dealing
 
-1. Select **Create a table → Configure rules**. Choose MCR, Riichi, or Singapore. Use the **Play**, **Scoring**, **Chips**, and **Bonuses** tabs to edit the clocks, calls, scoring, fake chips, and house bonuses. Variant-specific controls appear for the selected preset.
+1. Select **Create a table → Configure rules**. Choose MCR, Riichi, or Singapore. Use the **Play**, **Scoring**, **Chips**, and **Bonuses** tabs to edit the clocks, calls, scoring, fake chips, and house bonuses. The Play tab also sets the next-hand countdown (0 disables it), advance-when-ready, and host-force permissions. At least one advance mechanism must remain enabled. Variant-specific controls appear for the selected preset.
 2. Orange dots and highlighted fields mark changes from that preset. Select **Use these rules**, then create the table. For immediate bot play, configure rules before checking **Fill empty seats with bots**.
 3. At a waiting table, the **settings** button opens the full editor for the table host or the containing lobby's host. Select **Apply table rules**. Other players should immediately see the new values, including updated starting balances. Their settings panel is read-only.
 4. Start the game. Settings now show **Locked for this match** for everyone. The server rejects edits after the first deal. **Save a copy to my rulesets** keeps the active configuration for a future table.
 
 ### Table controls and effects
 
-- **Recent actions:** the **Last discard** bubble retains the discarded tile and its player after a claim or the next draw. **Last turn** shows the most recent draw, discard, call, bonus, or win. Reload to verify these restore from the server's log. An opponent's draw never reveals its tile.
+- **Recent actions:** the **Last discard** bubble retains the discarded tile and its player after a claim or the next draw. Stacked beneath it, **Last turn** shows the most recent draw, discard, call, bonus, or win. Reload to verify these restore from the server's log. An opponent's draw never reveals its tile.
 - **Tile names:** hover any rack, meld, bonus, indicator, discard, claim, or result tile for its English name. Keyboard focus works on HTML tiles; on touch screens, tap. Face-up tiles on the 3D table also support pointer inspection. Tile backs must never reveal names.
-- **Your hand:** select the meld meter beside **Sort tiles**. Declared melds fill the four set slots; the inspector shows the current concealed tiles, larger melds, suit counts, and possible pairs. This describes your tiles; the server still decides whether a hand qualifies to win. Hover individual exposed tiles in either view.
-- **Arrange the rack:** drag a tile to another position with a mouse or finger. On a keyboard, focus a tile and press **Alt + Left/Right**. **Sort tiles** restores suit/rank order. Arrange tiles during other players' turns too. Refresh to confirm that your order survives reconnects. Moving a tile must never discard it.
-- **Read the river:** hover over, focus, or tap the circular **Discards** seal in the middle of the board. The ledger groups discards by tile kind, sorted by suit and rank, with each count underneath. Called discards remain in the historical count and show a separate “called” annotation. Tap to pin it; use its close button or **Escape** to dismiss it.
+- **Your hand:** select the meld meter beside **Sort tiles**. Declared melds fill the four set slots; the inspector shows the current concealed tiles, larger melds, suit counts, and possible pairs. Open the **Winning routes** tab for suggested completions, tiles to collect/release, scoring patterns, and their point payments. These bounded-search estimates use your hand and public information, assuming an ordinary self-draw; they are not guaranteed future draws. The server still decides whether a hand qualifies to win. Hover individual exposed tiles in either view.
+- **Arrange the rack:** drag a tile to another position with a mouse or finger. On a keyboard, focus a tile and press **Alt + Left/Right**. **Sort tiles** restores suit/rank order. Receiving a new tile automatically sorts the entire rack. Your arrangement survives other state updates until the next incoming tile. Arrange tiles during other players' turns too. Refresh to confirm that your order survives reconnects. Moving a tile must never discard it.
+- **Read the river:** hover over or focus the compact **Discards** button at the right corner of the center river. Click/tap it to toggle a pinned ledger that stays open when you move away. The ledger groups discards by tile kind, sorted by suit and rank, with each count underneath. Called discards remain in the historical count and show a separate “called” annotation. Tap again to unpin and close it, or use its close button or **Escape**.
 - **Inspect scoring:** a complete MCR shape shows its qualifying fan beside your hand. Click it for a breakdown. MCR needs eight fan **excluding flowers**. For basic four-set-and-pair play, save a house ruleset with **Minimum fan = 0** before creating a new table.
 - **Claims and wins:** a resolved call produces a character/title cut-in, a single stylized impact burst, ember trails, tile movement, and a brief camera impact. Mahjong has a longer fire-and-gold celebration before the score panel. These visuals do not delay the server or block action buttons. Enable sound for tile clicks, bonus chimes, percussion on calls, and a rising victory chord. Adjust volume in table settings. Enable the operating system's reduced-motion setting to check the static presentation.
+- **Winning hand and readiness:** the result includes concealed tiles, all declared chows/pungs/kongs, and bonus tiles. Check the color legend and English tooltips. Bots count as ready; each human click updates the shared **N/4 ready** count. A host can force the next hand if enabled. Disable readiness or the timer before play to check each advance mechanism independently; disabling every mechanism is rejected.
 - **Game log and help:** use the clock and book buttons in the table toolbar. Both open inside the game view. On desktop, the diagonal-arrow button toggles fullscreen.
 - **Small screens:** try 390 × 844 portrait and 844 × 390 landscape. The rack uses two rows in portrait and moves beside the board in landscape. Claim buttons and discards should remain inside the viewport, including at browser zoom.
 
@@ -123,15 +124,26 @@ npm run build
 # four players, turns, reconnect, bots, mobile, safe text, reduced motion,
 # dragging, MCR qualification, grouped discards, claims and win effects,
 # tile tooltips, hand inspector, last actions, and synchronized table settings
-npx playwright install chromium
+npx playwright install chromium webkit
 npm run test:e2e
+
+# Android Chromium and iPhone WebKit: touch, portrait/landscape, full results,
+# readiness, winning routes, pinning discards, automatic sorting, and starts
+npm run test:mobile
+
+# Restricted deployment commands, health checks, recovery, state-version guard
+npm run test:deploy
 ```
 
 Engine tests use fixed seeds, physical tile-conservation checks, and scoring fixtures. Production tables use a cryptographic shuffle rather than exposing or reusing test seeds. Browser tests start their own production-build server on **3101** and use `test-results/browser-state.json`; they do not use the main game data file. The table-window scenarios also launch isolated in-memory services on random local ports and install deterministic hands directly in those test services. There is no fixture endpoint or game-state override in the deployed app. Playwright saves screenshots and traces on failure.
 
-A convenient targeted run:
+**[Individual game-state testing guide](docs/game-state-testing.md)** maps each transition to its test and explains deterministic hands, seed replay, visual inspection, and adding regressions. Mobile emulation covers touch and layout in real browser engines; also test on physical phones for audio/GPU/network behavior.
+
+Run desktop and mobile suites sequentially because both use port 3101. A convenient targeted run:
 
 ```sh
+npm run test:state
+npm run test:state -- -t 'pung|chow|kong'
 npx vitest run tests/engine.test.ts
 npx vitest run tests/multiplayer.test.ts
 npx vitest run tests/dev-server.test.ts

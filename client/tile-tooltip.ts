@@ -54,11 +54,12 @@ export function showTileTooltip(
   tip.style.top = `${Math.min(innerHeight - rect.height - 8, top)}px`;
 }
 export function installTileTooltips() {
+  let touch: { tile: HTMLElement; x: number; y: number; moved: boolean } | undefined;
   const target = (event: Event) =>
     (event.target as Element).closest<HTMLElement>('[data-tile-name]');
   document.addEventListener('pointerover', (event) => {
     const tile = target(event);
-    if (tile && !event.buttons)
+    if (tile && event.pointerType === 'mouse' && !event.buttons)
       showTileTooltip(
         tile.dataset.tileName!,
         event.clientX,
@@ -67,7 +68,8 @@ export function installTileTooltips() {
       );
   });
   document.addEventListener('pointerout', (event) => {
-    if (target(event)) hideTileTooltip();
+    // Touch has no hover: WebKit sends pointerout as soon as the finger lifts.
+    if (event.pointerType === 'mouse' && target(event)) hideTileTooltip();
   });
   document.addEventListener('focusin', (event) => {
     const tile = target(event);
@@ -79,18 +81,35 @@ export function installTileTooltips() {
   document.addEventListener('pointerdown', (event) => {
     hideTileTooltip();
     const tile = target(event);
-    if (event.pointerType !== 'mouse' && tile) {
-      showTileTooltip(
-        tile.dataset.tileName!,
-        event.clientX,
-        tile.getBoundingClientRect().top,
-        tile,
-      );
-      timer = setTimeout(hideTileTooltip, 2200);
-    }
+    touch =
+      event.pointerType !== 'mouse' && tile
+        ? { tile, x: event.clientX, y: event.clientY, moved: false }
+        : undefined;
   });
   document.addEventListener('pointermove', (event) => {
+    if (touch && Math.hypot(event.clientX - touch.x, event.clientY - touch.y) >= 7)
+      touch.moved = true;
     if (event.buttons) hideTileTooltip();
+  });
+  document.addEventListener('pointercancel', () => {
+    touch = undefined;
+    hideTileTooltip();
+  });
+  document.addEventListener('pointerup', () => {
+    const tap = touch;
+    touch = undefined;
+    if (!tap || tap.moved) return;
+    // Let the tap's selection/focus changes finish before positioning its label.
+    requestAnimationFrame(() => {
+      if (!tap.tile.isConnected) return;
+      showTileTooltip(
+        tap.tile.dataset.tileName!,
+        tap.x,
+        tap.tile.getBoundingClientRect().top,
+        tap.tile,
+      );
+      timer = setTimeout(hideTileTooltip, 2200);
+    });
   });
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') hideTileTooltip();

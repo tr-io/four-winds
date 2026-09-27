@@ -3,11 +3,8 @@ import { tileHTML } from './tile-art';
 export function reconcileOrder(order: number[], hand: number[], drawn: number | null) {
   const available = new Set(hand);
   const retained = [...new Set(order)].filter((tile) => available.has(tile));
-  const incoming = hand
-    .filter((tile) => !retained.includes(tile) && tile !== drawn)
-    .sort((a, b) => a - b);
-  if (drawn !== null && available.has(drawn) && !retained.includes(drawn)) incoming.push(drawn);
-  return [...retained, ...incoming];
+  // A new physical tile starts a freshly sorted rack. Other state updates retain manual order.
+  return hand.some((tile) => !retained.includes(tile)) ? [...hand].sort((a, b) => a - b) : retained;
 }
 
 export function moveTile(order: number[], tile: number, index: number) {
@@ -55,7 +52,11 @@ export class HandRack {
         /* Storage is optional. */
       }
     }
-    if (this.drag && !hand.includes(this.drag.id)) this.cancel();
+    if (
+      this.drag &&
+      (!hand.includes(this.drag.id) || hand.some((tile) => !this.order.includes(tile)))
+    )
+      this.cancel();
     this.order = reconcileOrder(this.order, hand, drawn);
     const present = new Set(this.order);
     for (const child of [...this.element.children] as HTMLElement[]) {

@@ -4,6 +4,9 @@ const common = {
   rounds: 4,
   claimSeconds: 8,
   turnSeconds: 35,
+  nextHandSeconds: 60,
+  advanceWhenReady: true,
+  hostCanAdvance: true,
   allowChow: true,
   allowKong: true,
   sevenPairs: true,
@@ -84,6 +87,9 @@ export const rulesSchema = z
     rounds: z.number().int().min(1).max(4),
     claimSeconds: z.number().int().min(3).max(30),
     turnSeconds: z.number().int().min(10).max(120),
+    nextHandSeconds: z.number().int().min(0).max(300).default(60),
+    advanceWhenReady: z.boolean().default(true),
+    hostCanAdvance: z.boolean().default(true),
     allowChow: z.boolean(),
     allowKong: z.boolean(),
     sevenPairs: z.boolean(),
@@ -117,6 +123,11 @@ export const rulesSchema = z
       .max(8),
   })
   .superRefine((r, ctx) => {
+    if (!r.nextHandSeconds && !r.advanceWhenReady && !r.hostCanAdvance)
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Enable a next-hand clock, ready advance, or host advance.',
+      });
     if (r.preset === 'riichi' && r.minimum > 13)
       ctx.addIssue({ code: 'custom', message: 'Riichi minimum must be at most 13 han.' });
     if (r.preset === 'singapore' && r.minimum > r.taiCap)

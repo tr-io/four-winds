@@ -54,6 +54,51 @@ afterEach(async () => {
 });
 
 describe('four-player socket rooms', () => {
+  it('synchronizes readiness and allows only the host to force the configured next hand', async () => {
+    const host = await client(),
+      guest = await client();
+    const rules = {
+      ...PRESETS.mcr,
+      nextHandSeconds: 0,
+      advanceWhenReady: false,
+      hostCanAdvance: true,
+    };
+    await host.command('create', { name: 'Ready checks', rules, bots: false });
+    await guest.command('join', host.state.room!.code);
+    await host.command('fill-bots');
+    await host.command('start');
+    const g = service.rooms.get(host.state.room!.code)!.game!;
+    g.phase = 'ended';
+    g.turnDeadline = 0;
+    g.decision++;
+    g.result = {
+      winner: null,
+      from: null,
+      reason: 'Fixture draw',
+      deltas: [0, 0, 0, 0],
+      hands: g.players.map((p) => p.hand),
+      repeat: false,
+    };
+    g.players.forEach((p) => (p.ready = p.bot));
+    service.broadcast();
+    await flush();
+    const decision = g.decision;
+    expect((await guest.command('force-next-hand', { decision })).ok).toBe(false);
+    expect((await host.command('force-next-hand', { decision: decision - 1 })).ok).toBe(false);
+    expect((await guest.command('ready', { decision })).ok).toBe(true);
+    expect((await host.command('ready', { decision })).ok).toBe(true);
+    await flush();
+    expect(guest.state.room!.game!.players.filter((p) => p.ready)).toHaveLength(4);
+    expect(g.phase).toBe('ended');
+    g.rules.hostCanAdvance = false;
+    expect((await host.command('force-next-hand', { decision })).ok).toBe(false);
+    g.rules.hostCanAdvance = true;
+    expect((await host.command('force-next-hand', { decision })).ok).toBe(true);
+    expect(g.handNumber).toBe(2);
+    expect((await host.command('force-next-hand', { decision })).ok).toBe(false);
+    expect(g.handNumber).toBe(2);
+  });
+
   it('shares pre-deal rules, applies them to balances and the deal, and locks them during play', async () => {
     const host = await client(),
       guest = await client();

@@ -1,0 +1,8 @@
+[Unit]
+Description=Snapshot Four Winds game data
+After=docker.service
+Requires=docker.service
+[Service]
+Type=oneshot
+User=root
+ExecStart=/usr/local/sbin/four-winds-release backup

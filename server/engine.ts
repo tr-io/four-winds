@@ -829,7 +829,7 @@ function finishHand(g: Game, now: number) {
   g.claim = null;
   g.decision++;
   g.phase = 'ended';
-  g.turnDeadline = now + 60000;
+  g.turnDeadline = g.rules.nextHandSeconds ? now + g.rules.nextHandSeconds * 1000 : 0;
   for (const p of g.players) p.ready = p.bot;
   const lastRotation = g.rotation === 3 && g.round === g.rules.rounds - 1;
   if (lastRotation && !g.result!.repeat) {
@@ -943,7 +943,11 @@ export function tickGame(g: Game, now = Date.now()): boolean {
       actions.find((a) => a.id === 'end-hand');
     if (a) applyAction(g, g.turn, g.decision, a.id, now, true);
   }
-  if (g.phase === 'ended' && (g.players.every((p) => p.ready) || now >= g.turnDeadline))
+  if (
+    g.phase === 'ended' &&
+    ((g.rules.advanceWhenReady && g.players.every((p) => p.ready)) ||
+      (g.turnDeadline > 0 && now >= g.turnDeadline))
+  )
     nextHand(g, now);
   return before !== g.decision + ':' + g.claimOrder + ':' + g.phase;
 }

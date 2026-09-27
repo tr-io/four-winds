@@ -37,10 +37,11 @@ it('marks gameplay changes against the active preset, excluding unrelated varian
 });
 
 describe('local tile order', () => {
-  it('keeps manual order as tiles are drawn, discarded, or moved into a meld', () => {
-    expect(reconcileOrder([12, 0, 5, 4], [0, 4, 12, 80], 80)).toEqual([12, 0, 4, 80]);
-    expect(reconcileOrder([], [80, 12, 0, 4], 12)).toEqual([0, 4, 80, 12]);
-    expect(reconcileOrder([4, 4, 9, 0], [0, 4, 5], null)).toEqual([4, 0, 5]);
+  it('sorts on incoming tiles and preserves manual order on other updates', () => {
+    expect(reconcileOrder([12, 0, 5, 4], [0, 4, 12], null)).toEqual([12, 0, 4]);
+    expect(reconcileOrder([12, 0, 5, 4], [0, 4, 12, 80], 80)).toEqual([0, 4, 12, 80]);
+    expect(reconcileOrder([], [80, 12, 0, 4], 12)).toEqual([0, 4, 12, 80]);
+    expect(reconcileOrder([4, 4, 9, 0], [0, 4, 5], null)).toEqual([0, 4, 5]);
   });
   it('moves physical tiles without confusing identical faces or losing a tile', () => {
     const hand = [0, 1, 2, 36, 37];

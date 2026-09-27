@@ -9,7 +9,7 @@ import './style.css';
 import './game.css';
 import './refinements.css';
 import { io } from 'socket.io-client';
-import type { AppState, GameView, Preset, Rules } from '../shared/types';
+import type { AppState, GameView, HandAnalysis, Preset, Rules } from '../shared/types';
 import { PRESETS, PRESET_DETAILS, rulesSchema } from '../shared/rules';
 import { WINDS, WIND_SYMBOLS, tileName } from '../shared/tiles';
 import { MahjongTable } from './table';
@@ -17,9 +17,11 @@ import { tileStatic } from './tile-art';
 import { HandRack } from './hand-rack';
 import { summarizeDiscards } from './discards';
 import { TableEffects } from './table-effects';
+import { freshDealKey } from './deal-sequence';
 import { installTileTooltips, hideTileTooltip } from './tile-tooltip';
 import { GameAudio, type SoundCue } from './game-audio';
 import { handInsight } from './hand-insight';
+import { winningHandHTML, winningRoutesHTML } from './hand-results';
 import { activeRuleKeys, ruleChanges, ruleLabels, ruleValue } from '../shared/rule-summary';
 function requestId() {
   if (crypto.randomUUID) return crypto.randomUUID();
@@ -170,6 +172,13 @@ socket.on('state', (next: AppState) => {
   render();
   const g = state.room?.game;
   if (g) {
+    const dealKey = freshDealKey(state.room!.code, g, next.serverTime);
+    if (dealKey && sessionStorage.getItem('four-winds-last-deal') !== dealKey) {
+      sessionStorage.setItem('four-winds-last-deal', dealKey);
+      table?.deal(g);
+      effects?.deal(g.handNumber);
+      tone('start');
+    }
     if (!g.result && activeDialog === 'result') closeDialog();
     const eventKey = `${state.room!.code}:${g.handNumber}`;
     if (eventRoom !== eventKey || (g.events.at(-1)?.id ?? 0) < lastEvent) {
@@ -303,9 +312,9 @@ function roomShell() {
   return `<section class="game-window" aria-label="Mahjong game window">
     <header class="game-toolbar"><button class="icon-button" data-do="leave" aria-label="Leave table">${icon('back')}</button><div class="game-wordmark">四風 <span>FOUR WINDS</span></div><div class="table-title"><strong id="room-title"></strong><button id="room-rules" class="rule-pill" data-do="table-settings" aria-label="Table rules"></button></div><div class="game-tools"><span class="game-connection" data-link-state>${connected ? 'LIVE' : 'RECONNECTING'}</span><button class="text-button room-code-button" data-do="share-room" aria-label="Copy table invitation">${icon('copy')} <span id="room-code"></span></button><button class="icon-button" data-do="table-settings" aria-label="Table settings">${icon('settings')}</button><button class="icon-button" data-do="log" aria-label="Game log" aria-expanded="false">${icon('clock')}</button><button class="icon-button" data-do="sound" aria-label="Toggle game sounds">${icon(sound ? 'sound' : 'mute')}</button><button class="icon-button" data-do="help" aria-label="Table help">${icon('book')}</button><button class="icon-button fullscreen-button" data-do="fullscreen" aria-label="Toggle fullscreen">${icon('diagonal')}</button></div></header>
     <div class="board-area"><div class="game-table table-entrance"><div class="table-grain"></div><div class="game-meta" id="game-meta"></div><div id="live-table"></div><div id="seat-overlays"></div><div id="table-status"></div><div id="recent-actions" class="recent-actions" aria-label="Last table actions"></div><div id="table-effects" aria-live="polite"></div>
-      <div class="discard-inspector" id="discard-inspector"><button class="discard-trigger" data-do="discards" aria-label="Show discarded tiles" aria-expanded="false" aria-controls="discard-ledger"><span>河</span><small>DISCARDS</small></button><section class="discard-ledger" id="discard-ledger" aria-label="Discarded tiles" hidden><header><div><strong>Discard ledger</strong><small>All seats · sorted by suit and rank</small></div><button class="icon-button" data-do="close-discards" aria-label="Close discarded tiles">${icon('close')}</button></header><div id="discard-groups"></div><p>Counts include called tiles. “Called” tiles are now in exposed melds.</p></section></div>
+      <div class="discard-inspector" id="discard-inspector"><button class="discard-trigger" data-do="discards" aria-label="Show discarded tiles" aria-expanded="false" aria-controls="discard-ledger" aria-pressed="false"><span>河</span><small>DISCARDS</small></button><section class="discard-ledger" id="discard-ledger" aria-label="Discarded tiles" hidden><header><div><strong>Discard ledger</strong><small>All seats · sorted by suit and rank</small></div><button class="icon-button" data-do="close-discards" aria-label="Close discarded tiles">${icon('close')}</button></header><div id="discard-groups"></div><p>Counts include called tiles. “Called” tiles are now in exposed melds.</p></section></div>
     </div><aside class="game-drawer" id="game-drawer" hidden><header><strong>TABLE RECORD</strong><button class="icon-button" data-do="log" aria-label="Close game log">${icon('close')}</button></header><div id="table-sidebar"></div><div id="log-entries" role="log" aria-label="Game log"></div></aside></div>
-    <section id="hand-area" class="game-dock" aria-label="Your hand and actions"><div id="waiting-controls"></div><div id="playing-controls"><div id="action-dock"></div><div class="hand-header"><div id="hand-guidance"></div><div class="rack-tools"><button class="hand-insight-button" id="hand-shape" data-do="hand-detail" aria-label="Inspect your hand"></button><span class="your-wind" id="your-wind"></span><button class="text-button" data-do="sort" aria-label="Sort tiles by suit and rank">Sort tiles ${icon('chevron')}</button></div></div><p id="rack-instructions" class="sr-only">Drag to arrange your tiles. With a tile focused, use Alt and Left or Right to move it. Select a playable tile, then press Discard.</p><div class="hand-tiles" role="group" aria-label="Your concealed tiles"></div><div id="exposed-hand" class="exposed-hand"></div><span class="sr-only" id="rack-announcement" role="status"></span></div></section>
+    <section id="hand-area" class="game-dock" aria-label="Your hand and actions"><div id="waiting-controls"></div><div id="playing-controls"><div id="action-dock"></div><div id="round-transition"></div><div class="hand-header"><div id="hand-guidance"></div><div class="rack-tools"><button class="hand-insight-button" id="hand-shape" data-do="hand-detail" aria-label="Inspect your hand"></button><span class="your-wind" id="your-wind"></span><button class="text-button" data-do="sort" aria-label="Sort tiles by suit and rank">Sort tiles ${icon('chevron')}</button></div></div><p id="rack-instructions" class="sr-only">Drag to arrange your tiles. With a tile focused, use Alt and Left or Right to move it. Select a playable tile, then press Discard.</p><div class="hand-tiles" role="group" aria-label="Your concealed tiles"></div><div id="exposed-hand" class="exposed-hand"></div><span class="sr-only" id="rack-announcement" role="status"></span></div></section>
   </section>`;
 }
 function renderRoom() {
@@ -433,13 +442,59 @@ function handDetailHTML(g: GameView) {
   const max = Math.max(1, ...insight.suits);
   return `<div class="hand-overview"><div class="hand-route"><span>${insight.closed ? '門 CLOSED' : '副 OPEN'}</span><h3>${insight.route}</h3></div><div class="set-slots" aria-label="${insight.locked} declared melds of four">${Array.from({ length: 4 }, (_, i) => `<span class="${i < insight.locked ? 'filled' : ''}">${i < insight.locked ? { pung: '碰', chow: '吃', kong: '槓' }[me.melds[i].kind] : '—'}<small>${i < insight.locked ? me.melds[i].kind : 'set'}</small></span>`).join('')}<span class="pair-slot">対<small>pair</small></span></div><p class="field-help">Declared sets are filled. Complete concealed sets and special hands are checked when you win.</p><div class="detail-rack">${me.hand.map((t) => tileStatic(t)).join('')}</div><div class="detail-melds">${meldsHTML(g)}</div><div class="suit-bars">${['Characters 萬', 'Circles 筒', 'Bamboo 索', 'Honors 字'].map((label, i) => `<div><span>${label}</span><i style="--fill:${(insight.suits[i] / max) * 100}%"></i><b>${insight.suits[i]}</b></div>`).join('')}</div>${insight.pairs.length ? `<div class="pair-candidates"><span>Pair candidates</span>${insight.pairs.map((t) => tileStatic(t, 'mini')).join('')}</div>` : ''}<p class="field-help">Tile composition, not a scoring prediction. Candidate pairs may also form chows or pungs.</p></div>`;
 }
+let handTab = 'overview';
+let analysisKey = '';
+let analysisPending = false;
+function selectHandTab(tab: string) {
+  handTab = tab;
+  modal
+    .querySelectorAll<HTMLElement>('[data-hand-tab]')
+    .forEach((b) => b.setAttribute('aria-selected', String(b.dataset.handTab === tab)));
+  document.querySelector<HTMLElement>('#hand-detail-body')!.hidden = tab !== 'overview';
+  document.querySelector<HTMLElement>('#hand-winning-routes')!.hidden = tab !== 'winning';
+  if (tab === 'winning') void requestHandAnalysis();
+}
+async function requestHandAnalysis() {
+  const g = state?.room?.game;
+  if (!g || activeDialog !== 'hand-detail' || handTab !== 'winning' || analysisPending) return;
+  const key = `${state!.room!.code}:${g.handNumber}:${g.decision}`;
+  if (key === analysisKey) return;
+  analysisPending = true;
+  setHTML(
+    '#hand-winning-routes',
+    '<p class="analysis-loading" role="status">Reading the hand…</p>',
+  );
+  try {
+    const result = await command('analyze-hand');
+    if (
+      activeDialog === 'hand-detail' &&
+      key === `${state?.room?.code}:${state?.room?.game?.handNumber}:${state?.room?.game?.decision}`
+    ) {
+      analysisKey = key;
+      setHTML('#hand-winning-routes', winningRoutesHTML(result.analysis as HandAnalysis));
+    }
+  } catch {
+    setHTML(
+      '#hand-winning-routes',
+      '<button class="button outline" data-do="retry-analysis">Retry hand analysis</button>',
+    );
+  } finally {
+    analysisPending = false;
+    if (
+      key !== `${state?.room?.code}:${state?.room?.game?.handNumber}:${state?.room?.game?.decision}`
+    )
+      void requestHandAnalysis();
+  }
+}
 function showHandDetail() {
   const g = state?.room?.game;
+  handTab = 'overview';
+  analysisKey = '';
   if (g)
     openDialog(
       'hand-detail',
       'Your hand',
-      `<div id="hand-detail-body">${handDetailHTML(g)}</div>`,
+      `<div class="rule-tabs hand-tabs" role="tablist" aria-label="Hand views"><button type="button" role="tab" data-hand-tab="overview" aria-selected="true" aria-controls="hand-detail-body">Your hand</button><button type="button" role="tab" data-hand-tab="winning" aria-selected="false" aria-controls="hand-winning-routes">Winning routes</button></div><div id="hand-detail-body" role="tabpanel" aria-label="Your hand">${handDetailHTML(g)}</div><div id="hand-winning-routes" role="tabpanel" aria-label="Winning routes" hidden></div>`,
       true,
     );
 }
@@ -548,11 +603,16 @@ function renderGame(g: GameView) {
   );
   setHTML('#exposed-hand', meldsHTML(g));
   renderLastActions(g);
-  if (activeDialog === 'hand-detail') setHTML('#hand-detail-body', handDetailHTML(g));
+  if (activeDialog === 'hand-detail') {
+    setHTML('#hand-detail-body', handDetailHTML(g));
+    void requestHandAnalysis();
+  }
   setHTML(
     '#action-dock',
-    `<div class="action-bar ${isClaim ? 'claim-active' : ''}"><div class="action-context">${isClaim ? `${tileStatic(g.claim!.tile, 'claim-tile')}<div><strong>${g.claim?.submitted ? 'CALL LOCKED IN' : g.actions.length ? 'MAKE YOUR CALL' : 'CLAIM PENDING'}</strong><small>${esc(g.players[g.claim!.from].profile.name)} ${g.claim!.reason === 'discard' ? 'discarded' : 'declared a kong'} · <b data-countdown="${g.claim!.deadline}"></b></small></div>` : myTurn ? `<span class="turn-seal">打</span><div><strong>${blocked ? 'MORE FAN NEEDED' : g.actions.some((a) => a.kind === 'win') ? 'WINNING HAND' : 'CHOOSE YOUR DISCARD'}</strong><small>${blocked ? `${assessment!.qualifying} of ${assessment!.minimum} qualifying fan · flowers do not qualify` : 'Select a tile, then discard'} <b data-countdown="${g.turnDeadline}"></b></small></div>` : `<span class="turn-seal">${g.phase === 'ended' || g.phase === 'finished' ? '和' : '風'}</span><div><strong>${g.phase === 'ended' || g.phase === 'finished' ? 'HAND COMPLETE' : 'TABLE IN PLAY'}</strong><small>${isClaim ? 'Resolving calls' : 'Arrange your tiles while you wait'}</small></div>`}</div><div class="action-buttons">${specials.map((a) => `<button class="button ${a.kind === 'win' ? 'gold win-action' : 'primary'}" data-action="${a.id}">${a.tiles.length && a.kind !== 'win' ? a.tiles.map((t) => tileStatic(t, 'tiny')).join('') : a.kind === 'win' ? '<span class="action-glyph">和</span>' : ''}<span>${esc(a.label)}</span></button>`).join('')}${isClaim && g.actions.some((a) => a.kind === 'pass') ? '<button class="button outline" data-action="pass">Pass</button>' : ''}${g.actions.some((a) => a.kind === 'riichi') ? `<button class="button ${riichiMode ? 'primary' : 'outline'}" data-do="riichi">${riichiMode ? 'Cancel riichi' : 'Declare riichi'}</button>` : ''}${myTurn ? `<button class="button primary discard-button" data-do="discard" ${selected === null ? 'disabled' : ''}>${selected !== null ? `${riichiMode ? 'Riichi · ' : ''}Discard ${esc(tileName(selected))}` : 'Select a tile'} ${icon('arrow')}</button>` : g.phase === 'ended' ? `<button class="button primary" data-do="ready" ${me.ready ? 'disabled' : ''}>${me.ready ? 'Ready · waiting' : 'Ready for the next hand'} ${icon('arrow')}</button>` : g.phase === 'finished' && state!.room!.host === state!.profile.id ? `<button class="button primary" data-do="rematch">Play another match ${icon('arrow')}</button>` : ''}</div>${isClaim ? `<div class="claim-time-bar"><i data-progress="${g.claim!.deadline}" data-duration="${g.rules.claimSeconds * 1000}"></i></div>` : ''}</div>`,
+    `<div class="action-bar ${isClaim ? 'claim-active' : ''}"><div class="action-context">${isClaim ? `${tileStatic(g.claim!.tile, 'claim-tile')}<div><strong>${g.claim?.submitted ? 'CALL LOCKED IN' : g.actions.length ? 'MAKE YOUR CALL' : 'CLAIM PENDING'}</strong><small>${esc(g.players[g.claim!.from].profile.name)} ${g.claim!.reason === 'discard' ? 'discarded' : 'declared a kong'} · <b data-countdown="${g.claim!.deadline}"></b></small></div>` : myTurn ? `<span class="turn-seal">打</span><div><strong>${blocked ? 'MORE FAN NEEDED' : g.actions.some((a) => a.kind === 'win') ? 'WINNING HAND' : 'CHOOSE YOUR DISCARD'}</strong><small>${blocked ? `${assessment!.qualifying} of ${assessment!.minimum} qualifying fan · flowers do not qualify` : 'Select a tile, then discard'} <b data-countdown="${g.turnDeadline}"></b></small></div>` : `<span class="turn-seal">${g.phase === 'ended' || g.phase === 'finished' ? '和' : '風'}</span><div><strong>${g.phase === 'ended' || g.phase === 'finished' ? 'HAND COMPLETE' : 'TABLE IN PLAY'}</strong><small>${isClaim ? 'Resolving calls' : 'Arrange your tiles while you wait'}</small></div>`}</div><div class="action-buttons">${specials.map((a) => `<button class="button ${a.kind === 'win' ? 'gold win-action' : 'primary'}" data-action="${a.id}">${a.tiles.length && a.kind !== 'win' ? a.tiles.map((t) => tileStatic(t, 'tiny')).join('') : a.kind === 'win' ? '<span class="action-glyph">和</span>' : ''}<span>${esc(a.label)}</span></button>`).join('')}${isClaim && g.actions.some((a) => a.kind === 'pass') ? '<button class="button outline" data-action="pass">Pass</button>' : ''}${g.actions.some((a) => a.kind === 'riichi') ? `<button class="button ${riichiMode ? 'primary' : 'outline'}" data-do="riichi">${riichiMode ? 'Cancel riichi' : 'Declare riichi'}</button>` : ''}${myTurn ? `<button class="button primary discard-button" data-do="discard" ${selected === null ? 'disabled' : ''}>${selected !== null ? `${riichiMode ? 'Riichi · ' : ''}Discard ${esc(tileName(selected))}` : 'Select a tile'} ${icon('arrow')}</button>` : g.phase === 'ended' ? '' : g.phase === 'finished' && state!.room!.host === state!.profile.id ? `<button class="button primary" data-do="rematch">Play another match ${icon('arrow')}</button>` : ''}</div>${isClaim ? `<div class="claim-time-bar"><i data-progress="${g.claim!.deadline}" data-duration="${g.rules.claimSeconds * 1000}"></i></div>` : ''}</div>`,
   );
+  setHTML('#round-transition', g.phase === 'ended' ? nextHandHTML(g) : '');
+  if (activeDialog === 'result') setHTML('#next-hand-panel', nextHandHTML(g));
   renderDiscardLedger(g);
   renderCallEffect(g);
   document.querySelector('#table-sidebar')!.innerHTML = tableInfoHTML(g.rules);
@@ -588,11 +648,15 @@ function setDiscardsOpen(open: boolean) {
 function closeDiscards() {
   const inspector = document.querySelector<HTMLElement>('#discard-inspector');
   if (inspector) inspector.dataset.pinned = '';
+  document.querySelector('.discard-trigger')?.setAttribute('aria-pressed', 'false');
   setDiscardsOpen(false);
 }
 function toggleDiscards() {
   const inspector = document.querySelector<HTMLElement>('#discard-inspector')!;
   inspector.dataset.pinned = inspector.dataset.pinned ? '' : 'true';
+  document
+    .querySelector('.discard-trigger')!
+    .setAttribute('aria-pressed', String(!!inspector.dataset.pinned));
   setDiscardsOpen(!!inspector.dataset.pinned);
 }
 function bindDiscardInspector() {
@@ -770,12 +834,18 @@ function helpBody(r?: Rules) {
 function learnHTML() {
   return `<section class="learn-page"><div class="page-title"><span class="eyebrow">A TRADITION WORTH SHARING</span><h1>A few tiles.<br>A world of possibilities.</h1><p>You don’t need to know everything to take a seat.</p></div><div class="learn-grid">${(['mcr', 'riichi', 'singapore'] as Preset[]).map((p) => `<article class="learn-card"><h2>${PRESETS[p].name}</h2>${helpBody(PRESETS[p])}<button class="button primary" data-preset="${p}">Play this tradition ${icon('arrow')}</button></article>`).join('')}</div></section>`;
 }
+function nextHandHTML(g: GameView) {
+  if (g.phase !== 'ended') return '';
+  const ready = g.players.filter((p) => p.ready).length;
+  const me = g.players[g.seat];
+  return `<div class="next-hand-status"><div class="ready-seats" aria-label="${ready} of 4 players ready">${g.players.map((p) => `<span class="${p.ready ? 'is-ready' : ''}" title="${esc(p.profile.name)} · ${p.ready ? 'ready' : 'waiting'}">${p.ready ? '✓' : esc(p.profile.name.slice(0, 1))}</span>`).join('')}</div><strong>${ready}/4 ready</strong><span class="next-hand-clock">${g.turnDeadline ? `Next hand in <b data-countdown="${g.turnDeadline}"></b>` : g.rules.advanceWhenReady ? 'Starts when all ready' : 'Waiting for host'}</span><button class="button primary" data-do="ready" ${me.ready ? 'disabled' : ''}>${me.ready ? 'Ready ✓' : 'Ready'}</button>${state!.room!.host === state!.profile.id && g.rules.hostCanAdvance ? '<button class="button outline" data-do="force-next-hand">Start next hand</button>' : ''}</div>`;
+}
 function showResult(g: GameView) {
   const r = g.result!;
   openDialog(
     'result',
     r.winner === null ? 'A hand drawn.' : `${esc(g.players[r.winner].profile.name)} wins!`,
-    `<div class="result-banner ${r.winner !== null ? 'victory' : ''}">${icon(r.winner !== null ? 'trophy' : 'leaf')}<span>${esc(r.reason)}</span>${r.score ? `<strong>${r.score.value}<small>${r.score.unit}${r.score.fu ? ` · ${r.score.fu} fu` : ''}</small></strong>` : ''}</div>${r.winner !== null ? `<div class="result-hand">${r.hands[r.winner].map((t) => tileStatic(t)).join('')}</div><div class="score-patterns">${r.score!.patterns.map((p) => `<div><span>${esc(p.name)}</span><strong>+${p.value}</strong></div>`).join('')}</div>` : `<p class="dialog-intro">${g.rules.preset === 'riichi' ? `${r.tenpai?.map((i) => esc(g.players[i].profile.name)).join(', ') || 'No players'} in tenpai.` : 'The next hand is another chance.'}</p>`}<div class="result-scores">${g.players.map((p, i) => `<div>${avatarHTML(p.profile.name, p.profile.avatar, p.bot)}<span>${esc(p.profile.name)}</span><strong class="${r.deltas[i] >= 0 ? 'positive' : 'negative'}">${r.deltas[i] > 0 ? '+' : ''}${r.deltas[i].toLocaleString()}</strong>${g.rules.points ? `<small>${p.points.toLocaleString()} total</small>` : ''}</div>`).join('')}</div><p class="form-note">${g.phase === 'finished' ? 'Match complete. Totals include placement points where applicable.' : r.repeat ? 'The dealer keeps the seat for another hand.' : 'The winds turn. The next player becomes East.'}</p><button class="button primary full" data-do="${g.phase === 'finished' ? 'close' : 'ready'}">${g.phase === 'finished' ? 'Back to the table' : 'Ready for the next hand'} ${icon('arrow')}</button>`,
+    `<div class="result-banner ${r.winner !== null ? 'victory' : ''}">${icon(r.winner !== null ? 'trophy' : 'leaf')}<span>${esc(r.reason)}</span>${r.score ? `<strong>${r.score.value}<small>${r.score.unit}${r.score.fu ? ` · ${r.score.fu} fu` : ''}</small></strong>` : ''}</div>${r.winner !== null ? `${winningHandHTML(g)}<div class="score-patterns">${r.score!.patterns.map((p) => `<div><span>${esc(p.name)}</span><strong>+${p.value}</strong></div>`).join('')}</div>` : `<p class="dialog-intro">${g.rules.preset === 'riichi' ? `${r.tenpai?.map((i) => esc(g.players[i].profile.name)).join(', ') || 'No players'} in tenpai.` : 'The next hand is another chance.'}</p>`}<div class="result-scores">${g.players.map((p, i) => `<div>${avatarHTML(p.profile.name, p.profile.avatar, p.bot)}<span>${esc(p.profile.name)}</span><strong class="${r.deltas[i] >= 0 ? 'positive' : 'negative'}">${r.deltas[i] > 0 ? '+' : ''}${r.deltas[i].toLocaleString()}</strong>${g.rules.points ? `<small>${p.points.toLocaleString()} total</small>` : ''}</div>`).join('')}</div><p class="form-note">${g.phase === 'finished' ? 'Match complete. Totals include placement points where applicable.' : r.repeat ? 'The dealer keeps the seat for another hand.' : 'The winds turn. The next player becomes East.'}</p>${g.phase === 'finished' ? `<button class="button primary full" data-do="close">Back to the table ${icon('arrow')}</button>` : `<div id="next-hand-panel">${nextHandHTML(g)}</div>`}`,
     true,
   );
 }
@@ -846,7 +916,7 @@ function renderEditor() {
       )
       .join(
         '',
-      )}</select></label></div><fieldset><legend>The pace of play</legend><div class="form-grid three">${numberField('rounds', 'WINDS / ROUNDS', 1, 4)}${numberField('claimSeconds', 'CLAIM WINDOW (SECONDS)', 3, 30)}${numberField('turnSeconds', 'TURN CLOCK (SECONDS)', 10, 120)}</div><label>MELD CALL PRIORITY<select name="meldPriority"><option value="pung-first" ${r.meldPriority === 'pung-first' ? 'selected' : ''}>Pung & kong, then chow</option><option value="equal" ${r.meldPriority === 'equal' ? 'selected' : ''}>Equal · earliest valid click</option><option value="chow-first" ${r.meldPriority === 'chow-first' ? 'selected' : ''}>Chow, then pung & kong</option></select><small>Wins always come first. Earliest server-received click breaks ties.</small></label>${toggle('allowChow', 'Allow chows / chis', 'Sequences can be called from the preceding player.')}${toggle('allowKong', 'Allow kongs / kans', 'Four of a kind can be declared for a replacement tile.')}${toggle('sevenPairs', 'Allow seven pairs', 'Enable the seven-pair winning shape.')}${r.preset !== 'mcr' ? toggle('dealerRepeats', 'Dealer continuations', r.preset === 'singapore' ? 'Repeat a drawn hand if there were no kongs.' : 'Repeat after a dealer win or dealer tenpai draw.') : ''}</fieldset><fieldset><legend>Scoring & play points</legend><div class="form-grid">${numberField('minimum', `MINIMUM ${r.preset === 'riichi' ? 'HAN' : r.preset === 'singapore' ? 'TAI' : 'FAN'}`, r.preset === 'riichi' ? 1 : 0, r.preset === 'riichi' ? 13 : r.preset === 'singapore' ? 12 : 88)}${numberField('scoreMultiplier', 'POINT MULTIPLIER', 1, 10)}${numberField('startingPoints', 'STARTING POINTS', 0, 100000)}</div>${toggle('points', 'Track point totals', 'Keep a cumulative point balance across hands. Winning thresholds still apply when off.')}${r.preset === 'riichi' ? `${toggle('openTanyao', 'Open all simples', 'Allow tanyao in an open hand.')}${toggle('kiriage', 'Round up to mangan', '4 han / 30 fu and 3 han / 60 fu become mangan (EMA 2025).')}${toggle('uraDora', 'Ura dora', 'Reveal extra indicators for a winning riichi hand.')}` : ''}${r.preset === 'singapore' ? `<div class="form-grid">${numberField('taiCap', 'TAI CAP', 1, 12)}${numberField('sgBase', 'BASE POINT UNIT', 1, 100)}${numberField('sgSelfDraw', 'SELF-DRAW PAYMENT FACTOR', 1, 4)}${numberField('sgBonusUnit', 'INSTANT BONUS UNIT', 1, 100)}</div>${toggle('sgAnimals', 'Include animal tiles', 'Cat, rat, rooster, and centipede. Each adds tai.')}${toggle('sgFlowers', 'Include flowers & seasons', 'Eight bonus tiles, seat flowers, and flower wins.')}${toggle('sgInstantBonuses', 'Immediate bonus payments', 'Animal pairs, own flower pairs, full bonus sets, and open/added kongs.')}` : ''}</fieldset><fieldset><legend>Fake chips</legend>${toggle('chips', 'Play with fake chips', 'A separate ledger for fun, with no monetary value.')}<div class="form-grid">${numberField('startingChips', 'STARTING CHIPS', 0, 1000000)}${numberField('chipsPerPoint', 'FAKE CHIPS PER POINT', 0.001, 1000, 0.001)}</div></fieldset><fieldset><legend>Custom house bonuses</legend><p class="field-help">Add an executable scoring condition. ${r.preset === 'riichi' ? 'Bonuses are flat points after official han/fu scoring; they cannot create a yaku.' : `Bonuses add ${r.preset === 'mcr' ? 'fan' : 'tai'} and count toward the minimum.`}</p><div id="bonus-editor">${r.houseBonuses.map((b, i) => bonusRow(b, i)).join('')}</div><button type="button" class="text-button" data-do="add-bonus">${icon('plus')} Add a bonus</button></fieldset><div class="editor-footer"><span class="field-help">${editorContext === 'room' ? 'Shared with every seat · locks on first deal' : editorContext === 'create' ? 'Applies to your new table' : 'Saved with your profile'}</span><button class="button primary full">${editorContext === 'room' ? 'Apply table rules' : editorContext === 'create' ? 'Use these rules' : 'Save ruleset'} ${icon('check')}</button></div></form>`,
+      )}</select></label></div><fieldset><legend>The pace of play</legend><div class="form-grid three">${numberField('rounds', 'WINDS / ROUNDS', 1, 4)}${numberField('claimSeconds', 'CLAIM WINDOW (SECONDS)', 3, 30)}${numberField('turnSeconds', 'TURN CLOCK (SECONDS)', 10, 120)}</div><label>MELD CALL PRIORITY<select name="meldPriority"><option value="pung-first" ${r.meldPriority === 'pung-first' ? 'selected' : ''}>Pung & kong, then chow</option><option value="equal" ${r.meldPriority === 'equal' ? 'selected' : ''}>Equal · earliest valid click</option><option value="chow-first" ${r.meldPriority === 'chow-first' ? 'selected' : ''}>Chow, then pung & kong</option></select><small>Wins always come first. Earliest server-received click breaks ties.</small></label>${numberField('nextHandSeconds', 'NEXT HAND CLOCK (SECONDS, 0 = OFF)', 0, 300)}${toggle('advanceWhenReady', 'Advance when all four are ready', 'Start the next hand as soon as every seat is ready.')}${toggle('hostCanAdvance', 'Host can start the next hand', 'Let the table host advance before all players are ready.')}${toggle('allowChow', 'Allow chows / chis', 'Sequences can be called from the preceding player.')}${toggle('allowKong', 'Allow kongs / kans', 'Four of a kind can be declared for a replacement tile.')}${toggle('sevenPairs', 'Allow seven pairs', 'Enable the seven-pair winning shape.')}${r.preset !== 'mcr' ? toggle('dealerRepeats', 'Dealer continuations', r.preset === 'singapore' ? 'Repeat a drawn hand if there were no kongs.' : 'Repeat after a dealer win or dealer tenpai draw.') : ''}</fieldset><fieldset><legend>Scoring & play points</legend><div class="form-grid">${numberField('minimum', `MINIMUM ${r.preset === 'riichi' ? 'HAN' : r.preset === 'singapore' ? 'TAI' : 'FAN'}`, r.preset === 'riichi' ? 1 : 0, r.preset === 'riichi' ? 13 : r.preset === 'singapore' ? 12 : 88)}${numberField('scoreMultiplier', 'POINT MULTIPLIER', 1, 10)}${numberField('startingPoints', 'STARTING POINTS', 0, 100000)}</div>${toggle('points', 'Track point totals', 'Keep a cumulative point balance across hands. Winning thresholds still apply when off.')}${r.preset === 'riichi' ? `${toggle('openTanyao', 'Open all simples', 'Allow tanyao in an open hand.')}${toggle('kiriage', 'Round up to mangan', '4 han / 30 fu and 3 han / 60 fu become mangan (EMA 2025).')}${toggle('uraDora', 'Ura dora', 'Reveal extra indicators for a winning riichi hand.')}` : ''}${r.preset === 'singapore' ? `<div class="form-grid">${numberField('taiCap', 'TAI CAP', 1, 12)}${numberField('sgBase', 'BASE POINT UNIT', 1, 100)}${numberField('sgSelfDraw', 'SELF-DRAW PAYMENT FACTOR', 1, 4)}${numberField('sgBonusUnit', 'INSTANT BONUS UNIT', 1, 100)}</div>${toggle('sgAnimals', 'Include animal tiles', 'Cat, rat, rooster, and centipede. Each adds tai.')}${toggle('sgFlowers', 'Include flowers & seasons', 'Eight bonus tiles, seat flowers, and flower wins.')}${toggle('sgInstantBonuses', 'Immediate bonus payments', 'Animal pairs, own flower pairs, full bonus sets, and open/added kongs.')}` : ''}</fieldset><fieldset><legend>Fake chips</legend>${toggle('chips', 'Play with fake chips', 'A separate ledger for fun, with no monetary value.')}<div class="form-grid">${numberField('startingChips', 'STARTING CHIPS', 0, 1000000)}${numberField('chipsPerPoint', 'FAKE CHIPS PER POINT', 0.001, 1000, 0.001)}</div></fieldset><fieldset><legend>Custom house bonuses</legend><p class="field-help">Add an executable scoring condition. ${r.preset === 'riichi' ? 'Bonuses are flat points after official han/fu scoring; they cannot create a yaku.' : `Bonuses add ${r.preset === 'mcr' ? 'fan' : 'tai'} and count toward the minimum.`}</p><div id="bonus-editor">${r.houseBonuses.map((b, i) => bonusRow(b, i)).join('')}</div><button type="button" class="text-button" data-do="add-bonus">${icon('plus')} Add a bonus</button></fieldset><div class="editor-footer"><span class="field-help">${editorContext === 'room' ? 'Shared with every seat · locks on first deal' : editorContext === 'create' ? 'Applies to your new table' : 'Saved with your profile'}</span><button class="button primary full">${editorContext === 'room' ? 'Apply table rules' : editorContext === 'create' ? 'Use these rules' : 'Save ruleset'} ${icon('check')}</button></div></form>`,
     true,
   );
   const sections = [...modal.querySelectorAll<HTMLFieldSetElement>('#rules-form fieldset')];
@@ -964,6 +1034,10 @@ app.addEventListener('click', async (e) => {
       riichiMode = false;
       return;
     }
+    if (button.dataset.handTab) {
+      selectHandTab(button.dataset.handTab);
+      return;
+    }
     if (button.dataset.ruleTab !== undefined) {
       selectRuleTab(Number(button.dataset.ruleTab));
       return;
@@ -1063,8 +1137,13 @@ app.addEventListener('click', async (e) => {
         await command('start');
         break;
       case 'ready':
-        closeDialog();
-        await command('ready');
+        await command('ready', { decision: state!.room!.game!.decision });
+        break;
+      case 'force-next-hand':
+        await command('force-next-hand', { decision: state!.room!.game!.decision });
+        break;
+      case 'retry-analysis':
+        void requestHandAnalysis();
         break;
       case 'rematch':
         await command('rematch');

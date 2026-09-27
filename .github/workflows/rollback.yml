@@ -1,0 +1,31 @@
+name: Roll back production
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: four-winds-production
+  cancel-in-progress: false
+jobs:
+  rollback:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - name: Restore previous image, preserve game state
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          [[ "$DEPLOY_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]]
+          install -d -m 700 "$RUNNER_TEMP/fw-ssh"
+          trap 'rm -f "$RUNNER_TEMP/fw-ssh/key"' EXIT
+          printf '%s\n' "$DEPLOY_KEY" > "$RUNNER_TEMP/fw-ssh/key"
+          printf '%s\n' "$KNOWN_HOSTS" > "$RUNNER_TEMP/fw-ssh/known_hosts"
+          chmod 600 "$RUNNER_TEMP/fw-ssh/"*
+          ssh -i "$RUNNER_TEMP/fw-ssh/key" -o IdentitiesOnly=yes -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$RUNNER_TEMP/fw-ssh/known_hosts" \
+            "fwdeploy@$DEPLOY_HOST" rollback

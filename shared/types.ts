@@ -8,6 +8,9 @@ export type Rules = {
   rounds: number;
   claimSeconds: number;
   turnSeconds: number;
+  nextHandSeconds: number;
+  advanceWhenReady: boolean;
+  hostCanAdvance: boolean;
   allowChow: boolean;
   allowKong: boolean;
   sevenPairs: boolean;
@@ -91,6 +94,16 @@ export type Score = {
   patterns: { name: string; value: number }[];
   payments: number[];
 };
+export type WinningRoute = {
+  name: string;
+  hand: Tile[];
+  needed: Tile[];
+  discard: Tile[];
+  groups: { kind: 'chow' | 'pung' | 'pair' | 'special'; tiles: Tile[] }[];
+  score: Score;
+  points: number;
+};
+export type HandAnalysis = { decision: number; handNumber: number; routes: WinningRoute[] };
 export type HandResult = {
   winner: number | null;
   from: number | null;

@@ -4,6 +4,7 @@ import type { GameView } from '../shared/types';
 import { drawTileFace } from './tile-art';
 import { kind, tileName } from '../shared/tiles';
 import { hideTileTooltip, showTileTooltip } from './tile-tooltip';
+import { DEAL, dealTileDelay } from './deal-sequence';
 type Piece = {
   group: THREE.Group;
   face: THREE.Mesh;
@@ -12,6 +13,7 @@ type Piece = {
   born: number;
   from: THREE.Vector3;
   lift: number;
+  deal?: { index: number; duration: number };
 };
 export class MahjongTable {
   private renderer: THREE.WebGLRenderer;
@@ -206,6 +208,7 @@ export class MahjongTable {
     p.face.material = tile === null ? this.back : this.material(tile);
     p.face.userData.tile = tile;
     if (p.target.distanceToSquared(new THREE.Vector3(x, y, z)) > 0.001) {
+      p.deal = undefined;
       p.from.copy(p.group.position);
       p.born = performance.now();
       p.lift = Math.min(0.9, p.from.distanceTo(new THREE.Vector3(x, y, z)) * 0.17);
@@ -311,6 +314,27 @@ export class MahjongTable {
     );
     this.wake();
   }
+  deal(game: GameView) {
+    if (this.reduced) return;
+    const now = performance.now();
+    const delays = new Map<string, number>();
+    game.players.forEach((p, seat) => {
+      for (let i = 0; i < p.tileCount; i++)
+        delays.set(
+          p.hand[i] !== undefined ? `t${p.hand[i]}` : `hidden${seat}:${i}`,
+          dealTileDelay(seat, i, game.dealer),
+        );
+    });
+    let index = 0;
+    for (const [id, p] of this.pieces) {
+      const hand = delays.get(id);
+      p.deal = { index: index++, duration: hand === undefined ? DEAL.assemble : DEAL.flight };
+      p.born = now + (hand ?? DEAL.shuffle + (index % 8) * 15);
+      p.lift = hand === undefined ? 0.6 : 1.6;
+    }
+    this.container.dataset.deal = 'active';
+    this.wake();
+  }
   impact(win: boolean) {
     if (this.reduced) return;
     this.impactAt = performance.now();
@@ -325,6 +349,21 @@ export class MahjongTable {
     this.camera.aspect = w / h;
     this.camera.fov = this.preview ? (w / h < 1.2 ? 54 : 43) : w / h < 1.1 ? 56 : 40;
     this.camera.updateProjectionMatrix();
+    if (!this.preview) {
+      this.camera.updateMatrixWorld();
+      const point = new THREE.Vector3(2.4, 0.3, 1.6).project(this.camera);
+      const parent = this.container.parentElement!;
+      const rect = this.container.getBoundingClientRect(),
+        board = parent.getBoundingClientRect();
+      parent.style.setProperty(
+        '--discard-x',
+        `${rect.left - board.left + ((point.x + 1) / 2) * w}px`,
+      );
+      parent.style.setProperty(
+        '--discard-y',
+        `${rect.top - board.top + ((1 - point.y) / 2) * h}px`,
+      );
+    }
     this.wake();
   }
   private wake = () => {
@@ -339,14 +378,31 @@ export class MahjongTable {
       if (this.reduced) {
         p.group.position.copy(p.target);
         p.group.rotation.y = p.rotation;
+        p.deal = undefined;
       } else {
-        const t = Math.min(1, (now - p.born) / 430);
+        if (p.deal && now < p.born) {
+          const n = p.deal.index,
+            angle = n * 2.399 + now * 0.003;
+          const radius = 0.5 + (n % 11) * 0.16;
+          p.group.position.set(
+            Math.cos(angle) * radius,
+            0.2 + (n % 5) * 0.24,
+            Math.sin(angle) * radius,
+          );
+          p.group.rotation.y = angle;
+          p.from.copy(p.group.position);
+          moving = true;
+          continue;
+        }
+        const t = Math.max(0, Math.min(1, (now - p.born) / (p.deal?.duration ?? 430)));
         p.group.position.lerpVectors(p.from, p.target, 1 - Math.pow(1 - t, 3));
         p.group.position.y += Math.sin(t * Math.PI) * p.lift;
         p.group.rotation.y += (p.rotation - p.group.rotation.y) * 0.15;
         if (t < 1 || Math.abs(p.rotation - p.group.rotation.y) > 0.001) moving = true;
+        if (t === 1) p.deal = undefined;
       }
     }
+    if (![...this.pieces.values()].some((p) => p.deal)) delete this.container.dataset.deal;
     if (!this.preview) {
       const age = now - this.impactAt;
       const amplitude = age < 500 && !this.reduced ? this.impactStrength * (1 - age / 500) : 0;

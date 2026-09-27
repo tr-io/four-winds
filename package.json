@@ -13,7 +13,10 @@
     "postinstall": "patch-package",
     "test:e2e": "playwright test",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "test:mobile": "playwright test --config playwright.mobile.config.ts",
+    "test:deploy": "python3 -m unittest discover -s tests/deploy -v",
+    "test:state": "vitest run tests/game-state.test.ts tests/engine.test.ts tests/hand-analysis.test.ts"
   },
   "dependencies": {
     "@fontsource/cormorant-garamond": "^5.3.0",
