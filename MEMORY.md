@@ -101,6 +101,11 @@ were saved separately from one connected live table. Counts are a historical obs
 [DEPLOYMENT.md](DEPLOYMENT.md) is the complete DigitalOcean VPS/subdomain guide;
 [deployment research](docs/deployment-research.md) links the provider documentation.
 
+The guide now includes copyable `doctl` commands to authenticate, find the Droplet, create/attach
+the firewall, and inspect all attached firewalls. Syntax was verified with installed doctl against
+a local mock API; no cloud resources were changed. Its public SSH rule supports the current
+GitHub-hosted deployment runner and assumes the documented key-only/restricted-account setup.
+
 Checked-in workflows test pushes/PRs, build/publish a GHCR image for a published non-prerelease
 `vMAJOR.MINOR.PATCH` release, and deploy its immutable digest. **Saving a release draft does not
 deploy.** Manual rollback restores the previous image while preserving current game state;

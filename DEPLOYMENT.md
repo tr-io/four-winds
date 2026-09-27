@@ -51,6 +51,54 @@ For a tighter network boundary, use a static-IP runner or a VPN/tunnel and allow
 plus your administrative IP. Do not allowlist all of GitHub's changing runner ranges.
 [GitHub runner networking](https://docs.github.com/en/actions/reference/runners/github-hosted-runners#ip-addresses)
 
+### Create and attach the firewall with doctl
+
+Run these commands **on your computer** with `doctl` installed. Authenticate if needed and find
+your Droplet's numeric ID:
+
+```sh
+doctl auth init
+doctl compute droplet list --format ID,Name,PublicIPv4
+```
+
+Replace the placeholder below. This creates a new firewall and attaches it to that Droplet,
+allowing public TCP 22/80/443, UDP 443 for HTTP/3, and outbound TCP/UDP/ICMP over IPv4 and IPv6.
+[DigitalOcean's create command](https://docs.digitalocean.com/reference/doctl/reference/compute/firewall/create/)
+
+```sh
+DROPLET_ID="REPLACE_WITH_YOUR_DROPLET_ID"
+
+FIREWALL_ID="$(doctl compute firewall create \
+  --name "four-winds" \
+  --droplet-ids "$DROPLET_ID" \
+  --inbound-rules "\
+protocol:tcp,ports:22,address:0.0.0.0/0,address:::/0 \
+protocol:tcp,ports:80,address:0.0.0.0/0,address:::/0 \
+protocol:tcp,ports:443,address:0.0.0.0/0,address:::/0 \
+protocol:udp,ports:443,address:0.0.0.0/0,address:::/0" \
+  --outbound-rules "\
+protocol:tcp,ports:1-65535,address:0.0.0.0/0,address:::/0 \
+protocol:udp,ports:1-65535,address:0.0.0.0/0,address:::/0 \
+protocol:icmp,address:0.0.0.0/0,address:::/0" \
+  --format ID \
+  --no-header)"
+
+doctl compute firewall get "$FIREWALL_ID"
+doctl compute firewall list-by-droplet "$DROPLET_ID"
+```
+
+`address:::/0` is intentional: the `address:` field followed by IPv6's `::/0`.
+Save the returned firewall ID for later management. Use `doctl compute firewall list` to find it
+again instead of creating another firewall.
+
+**SSH is publicly reachable with these rules.** Complete the key-only SSH setup in section 2 and
+the restricted `fwdeploy` setup in section 3. Restricting port 22 to only your home IP would block
+the supplied GitHub Actions deployment workflow; use a static-IP runner or VPN for tighter rules.
+
+The commands give no inbound allowance to 3001, 5175, or Docker's API. Check other attached
+firewalls as well: their allow rules can open additional ports, and deny rules take precedence.
+[Combined firewall rules](https://docs.digitalocean.com/products/networking/firewalls/how-to/configure-rules/)
+
 ## 2. Prepare Ubuntu and an administrative account
 
 Use DigitalOcean's console to verify the server's SSH fingerprint before trusting its first
