@@ -65,7 +65,10 @@ export class SocialUI {
     }
     if (g) {
       this.queue = this.queue.filter((t) => g.players[g.seat].hand.includes(t));
-      if (g.result) this.queue = [];
+      if (g.result) {
+        this.queue = [];
+        this.queueMode = false;
+      }
       this.processQueue();
       this.notifyTurn();
     }
@@ -141,12 +144,37 @@ export class SocialUI {
   private renderQueue() {
     const root = document.querySelector('#discard-queue');
     if (!root) return;
-    root.innerHTML = `<button class="text-button" data-social="queue-mode" aria-pressed="${this.queueMode}">${this.queueMode ? '✓ Selecting discards' : 'Queue discards'}</button>${this.queue.length ? `<span>Next: ${this.queue.map((t, i) => `<button class="queued-tile" data-unqueue="${t}" aria-label="Remove ${esc(tileName(t))} from queue">${i + 1}. ${tileStatic(t, 'tiny')}</button>`).join('')}</span><button class="text-button" data-social="clear-queue">Clear</button>` : ''}${this.queueMode ? '<small>Choose tiles in discard order. They auto-discard on your turn; win and kong choices pause the queue.</small>' : ''}`;
+    const available = !!this.state?.room?.game && !this.state.room.game.result;
+    const focused = root.contains(document.activeElement)
+      ? (document.activeElement as HTMLElement)
+      : null;
+    const focusSelector = focused?.hasAttribute('data-unqueue')
+      ? `[data-unqueue="${focused.dataset.unqueue}"]`
+      : focused?.dataset.social
+        ? `[data-social="${focused.dataset.social}"]`
+        : null;
+    const markup = `<button class="button outline queue-toggle" data-social="queue-mode" aria-label="${this.queueMode ? 'Selecting discards · Done' : 'Queue discards'}" aria-pressed="${this.queueMode}" aria-describedby="queue-help" ${available ? '' : 'disabled'}><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5ZM3 12l9 5 9-5M3 16l9 5 9-5"/></svg><span>${this.queueMode ? 'Done queueing' : 'Queue discards'}</span><b class="tool-count" aria-label="${this.queue.length} queued tiles">${this.queue.length}</b></button><div class="queue-tray ${this.queue.length ? 'has-tiles' : ''}" role="group" aria-label="Queued discards">${this.queue.length ? `<span class="queue-label">Next</span>${this.queue.map((t, i) => `<button class="queued-tile" data-unqueue="${t}" aria-label="Remove ${esc(tileName(t))} from queue"><span>${i + 1}</span>${tileStatic(t, 'tiny')}<span aria-hidden="true">×</span></button>`).join('')}<button class="text-button" data-social="clear-queue">Clear</button>` : '<span class="queue-empty">No tiles queued</span>'}</div><small id="queue-help" class="${this.queueMode || this.queue.length ? '' : 'sr-only'}">${this.queueMode ? 'Choose tiles in discard order, then press Done queueing.' : this.queue.length ? 'Queued tiles auto-discard on your turn. Tap a queued tile to remove it.' : 'Queue tiles to auto-discard on your turn.'} Win and kong choices pause the queue.</small>`;
+    if (root.innerHTML !== markup) {
+      root.innerHTML = markup;
+      if (focusSelector)
+        (
+          root.querySelector<HTMLElement>(focusSelector) ??
+          root.querySelector<HTMLElement>('.queue-toggle')
+        )?.focus({ preventScroll: true });
+    }
     document.querySelectorAll<HTMLElement>('.hand-tiles [data-tile]').forEach((el) => {
       const index = this.queue.indexOf(Number(el.dataset.tile));
       el.classList.toggle('is-queued', index >= 0);
       if (index >= 0) el.dataset.queueOrder = String(index + 1);
       else delete el.dataset.queueOrder;
+      el.setAttribute(
+        'aria-description',
+        index >= 0
+          ? `Queued discard ${index + 1}`
+          : this.queueMode
+            ? 'Select to queue this tile'
+            : '',
+      );
     });
   }
   private processQueue() {

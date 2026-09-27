@@ -68,7 +68,7 @@ for (const viewport of [
       );
     });
     expect(overlap).toBe(false);
-    await page.getByRole('button', { name: 'Show discarded tiles' }).click();
+    await page.getByRole('button', { name: 'Discard ledger', exact: true }).click();
     await inViewport(page, '#discard-ledger');
     const group = page.locator('.discard-group').first();
     await group.scrollIntoViewIfNeeded();
@@ -76,7 +76,7 @@ for (const viewport of [
     const tile = (await group.locator('.tile').boundingBox())!;
     expect(tile.y).toBeGreaterThanOrEqual(ledger.y);
     expect(tile.y + tile.height).toBeLessThanOrEqual(ledger.y + ledger.height);
-    await page.getByRole('button', { name: 'Close discarded tiles' }).click();
+    await page.getByRole('button', { name: 'Close discard ledger' }).click();
     await page.locator('.hand-tiles .tile').first().click();
     await expect(page.locator('.discard-button')).toBeEnabled();
     await page.locator('.discard-button').scrollIntoViewIfNeeded();

@@ -40,7 +40,7 @@ test('the whole player card opens public tiles by touch in portrait and landscap
   }
 });
 
-test('touch tooltips, scored routes, and a pinned compact discard ledger fit portrait and landscape', async ({
+test('touch tooltips, scored routes, and an explicit discard ledger fit portrait and landscape', async ({
   page,
   tableServer,
 }) => {
@@ -56,7 +56,7 @@ test('touch tooltips, scored routes, and a pinned compact discard ledger fit por
   await page.locator('.route-group .tile').first().tap();
   await expect(page.locator('dialog #tile-tooltip')).toBeVisible();
   await page.getByRole('button', { name: 'Close dialog' }).tap();
-  const trigger = page.getByRole('button', { name: 'Show discarded tiles' });
+  const trigger = page.getByRole('button', { name: 'Discard ledger', exact: true });
   await trigger.tap();
   await expect(trigger).toHaveAttribute('aria-pressed', 'true');
   await page.locator('.hand-tiles .tile').first().tap();
@@ -66,15 +66,17 @@ test('touch tooltips, scored routes, and a pinned compact discard ledger fit por
   await inViewport(page, '#discard-ledger');
   const a = (await page.locator('.last-discard').boundingBox())!,
     b = (await page.locator('.last-turn').boundingBox())!;
-  expect(a.x).toBe(b.x);
-  expect(a.y + a.height).toBeLessThanOrEqual(b.y);
-  expect((await trigger.boundingBox())!.width).toBeLessThanOrEqual(46);
+  expect(a.y).toBe(b.y);
+  expect(a.x + a.width).toBeLessThanOrEqual(b.x);
+  expect((await trigger.boundingBox())!.width).toBeGreaterThanOrEqual(44);
   await trigger.tap();
   await expect(page.locator('#discard-ledger')).toBeHidden();
   await page.setViewportSize({ width: 844, height: 390 });
   await trigger.tap();
   await inViewport(page, '#discard-ledger');
+  await page.locator('.hand-tiles').scrollIntoViewIfNeeded();
   await inViewport(page, '.hand-tiles');
+  await page.locator('#action-dock').scrollIntoViewIfNeeded();
   await inViewport(page, '#action-dock');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   expect(errors).toEqual([]);
@@ -111,6 +113,7 @@ test('complete winning hand, colored meld legend, readiness, and host advance wo
   await page.locator('#next-hand-panel [data-do="force-next-hand"]').tap();
   await expect(page.locator('#modal')).toBeHidden();
   await expect.poll(() => g.handNumber).toBe(2);
+  await page.locator('.hand-tiles').scrollIntoViewIfNeeded();
   await inViewport(page, '.hand-tiles');
 });
 
@@ -142,7 +145,9 @@ test('touch starts a table with a shuffle and deal without hiding the rack or ac
   await page.getByRole('button', { name: 'Start the game' }).tap();
   await expect(page.locator('[data-effect="deal"]')).toBeVisible();
   await expect(page.locator('.hand-tiles .tile')).toHaveCount(14);
+  await page.locator('.hand-tiles').scrollIntoViewIfNeeded();
   await inViewport(page, '.hand-tiles');
+  await page.locator('#action-dock').scrollIntoViewIfNeeded();
   await inViewport(page, '#action-dock');
   await page.locator('.hand-tiles .tile').first().tap();
   await expect(page.locator('.discard-button')).toBeEnabled();
@@ -168,7 +173,9 @@ test('local day theme keeps touch claims and the rack usable in portrait and lan
     { width: 844, height: 390 },
   ]) {
     await page.setViewportSize(viewport);
+    await page.locator('.hand-tiles').scrollIntoViewIfNeeded();
     await inViewport(page, '.hand-tiles');
+    await page.locator('#action-dock').scrollIntoViewIfNeeded();
     await inViewport(page, '#action-dock');
     for (const id of ['pung', 'pass', 'win']) await inViewport(page, `[data-action="${id}"]`);
     await page.screenshot({

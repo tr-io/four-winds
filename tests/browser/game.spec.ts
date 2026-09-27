@@ -4,6 +4,9 @@ test('profile, saved rules, private lobby, four human seats, turn and reconnect'
   browser,
   page,
 }) => {
+  // Four independent WebGL clients take longer to boot on CI's software renderer.
+  // Allow time for the complete flow while keeping each assertion's normal deadline.
+  test.setTimeout(180_000);
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/');
@@ -40,7 +43,12 @@ test('profile, saved rules, private lobby, four human seats, turn and reconnect'
   const code = await page.locator('#room-code').innerText();
   const peers = [];
   for (let i = 0; i < 3; i++) {
-    const context = await browser.newContext();
+    // Compact peer views with reduced motion lower the cost of four WebGL clients.
+    // The primary view still exercises the full desktop layout and entrance animation.
+    const context = await browser.newContext({
+      viewport: { width: 800, height: 600 },
+      reducedMotion: 'reduce',
+    });
     const p = await context.newPage();
     await p.goto(`/?room=${code}`);
     await expect(p.locator('#room-title')).toHaveText('Four browser friends');
