@@ -5,41 +5,58 @@ before relying on the snapshot. Start with the user's latest request.
 
 ## Resume here
 
-1. Current work is **`fix/analysis-latency-and-server-capacity`**, based on updated `main`
-   at `66eb04f` after [PR #5](https://github.com/tr-io/four-winds/pull/5) merged. Changes are committed
-   and pushed to [PR #6](https://github.com/tr-io/four-winds/pull/6); check its state before follow-ups.
-   The user reported
-   Winning routes stalling the server and requested a 50–100-game / 400-player architecture audit
-   with diagrams. The branch moves suggestions to a cancellable **browser Web Worker** using
-   the existing scorer and the player's visible snapshot. Legacy `analyze-hand` commands return
-   a cheap refresh error; actual wins remain authoritative. Search ranking precomputes costs.
-   Game/timer/bot updates send private snapshots only to affected tables, with small public
-   `rooms-changed` events for the rest. Duplicate saves and shutdown disconnect storms are removed.
-   Proxy-aware handshake limits are opt-in via `TRUST_PROXY=1` in release Compose. Aggregate
-   `server-metrics` logs run once a minute. Gameplay rules and production state are unchanged.
-   See [architecture diagrams](docs/architecture.md) and [capacity audit](docs/capacity-audit.md).
-   **Capacity caveat:** local fresh-state 100-game/400-client test passed (3,356 actions, p95
-   70 ms, no failures). Ten archived hands per player caused 15-second timeouts and >1 GiB RSS.
-   Sustained 400-player support needs a transactional store with separate hand archives; that
-   migration also needs backup/restore and rollback changes. Do not claim production readiness.
-   `npm run test:load` uses isolated temporary storage; the documented history test intentionally
-   reproduces the outstanding bottleneck. Existing production Compose must be updated on-host
-   to enable the forwarded-client-address fix; image releases do not replace that file.
-   Verification: 100 unit/network, 47 desktop, 16 mobile, 5 deployment tests passed, with types,
-   build, formatting and Compose validation. Worker failure/retry and production CSP checks
-   also pass. Load results are recorded in the audit; private scratch profiles are ignored.
-   The prior tile/card fixes remain: all four board hands render (own faces, opponent backs), and
-   clicking the whole player card opens public melds, bonuses, and numbered discards.
-   Follow-up on the same PR: the opening title now finishes before recorded dice throws and
-   dealing, using shared timings for CSS, tile flights, and audio. Reduced motion uses a static
-   summary. Added independent local zoom opt-in (wheel/pinch and keyboard/touch buttons), camera
-   distance limits, and Reset view. Server snapshots preserve the enabled local camera; opponent
-   faces remain absent. Existing flower/rain/pond interactions were verified. The requested
-   postgame logs, saved-table prompt, and hidden-tab notifications were already implemented;
-   profiles use localStorage credentials with server-side histories, not identity cookies.
-   Opening-order regression failed before the fix and now passes for MCR, Riichi, Singapore,
-   and legacy hands without setup metadata. Camera tests cover wheel, Android pinch, touch
-   buttons, bounds, reset, preference persistence, and unchanged authoritative state.
+1. Current work is **`fix/player-presence-and-browser-saves`**, based on `origin/main`
+   at `2f8820b` after [PR #6](https://github.com/tr-io/four-winds/pull/6) merged. Changes are committed
+   and pushed to [PR #7](https://github.com/tr-io/four-winds/pull/7), currently open; check its state
+   before follow-ups. The user requested
+   clear presence indicators on the bottom-left of namecards and browser-scoped saved tables.
+   Human cards now have 16px blue/check Online and amber/dash Offline circles, with hover/focus
+   tooltips and accessible descriptions. Bots have no connection indicator. Removed the three
+   orange background-art circles that looked like detached status dots.
+   `client/saved-tables.ts` stores bookmarks under `four-winds-saved-tables:<profile ID>` in
+   localStorage (sessionStorage for isolated `?guest=1` tabs). The lobby only lists bookmarked
+   paused rooms; the profile dialog uses the same local list. Other browsers, including one
+   carrying the same credential, do not inherit bookmarks. Clearing/removing bookmarks stays
+   cleared through reloads and server snapshots; normal tabs synchronize via storage events.
+   Storage failures explain the problem and keep the player seated. Server room reservations
+   and hands still persist; another profile cannot release a reservation with `forget-table`.
+   Old server-only bookmark lists are no longer displayed or imported. Existing games remain
+   reachable by invitation code. No identity cookies were added; the existing credential model
+   still applies. Verification: **101 unit/network, 51 desktop, and 16 mobile tests pass**, plus
+   types/build/formatting and diff checks. The final artwork also passed a fresh presence browser
+   check and visual review. GitHub CI was running at handoff. Screenshots are in
+   `.cache/ui-review/presence-saves/` (ignored). Production has not been changed.
+
+   Follow-up on the same branch: the user approved reducing browser startup JavaScript.
+   Replaced runtime DiceBear generators with 24 checked-in SVGs, each byte-identical to the
+   previous data-URI image. Vite serves hashed image URLs; generator dependencies are now dev
+   dependencies. `npm run avatars:generate` refreshes the files and `avatars:check` runs in CI.
+   Lessons (including their CSS) load when opened; shared rule validation lives in
+   `shared/rules-schema.ts` and is downloaded only on form submission. The schema itself is
+   unchanged. Async guards prevent delayed downloads from replacing newer pages or submitting
+   closed forms; download failures preserve navigation/drafts and show recovery guidance.
+   Main JS: **1,262 → 719 kB**, gzip **394 → 193 kB**, below the unchanged 850 kB warning limit.
+   Five cold-cache runs with 4× CPU throttling, 1.6 Mbps down, and 150 ms latency improved median
+   lobby-ready time **3.68 → 2.57 seconds**. These are local Chromium measurements, not physical
+   phone or production results. See [browser performance](docs/browser-performance.md) and
+   `npm run measure:startup -- dist 5` for the repeatable isolated benchmark. Three.js still
+   loads eagerly because the lobby uses it. Follow-up verification: **101 unit/network, 56 desktop,
+   and 16 Android/iPhone tests pass**, along with types, build, avatar checks, formatting and diff
+   checks. The previous PR head passed GitHub CI; the bundle follow-up CI is pending after push.
+
+   Previous PR #6 moved Winning routes into a cancellable browser worker, rejected legacy
+   server analysis requests cheaply, narrowed socket broadcasts, removed duplicate saves, and
+   added proxy-aware limits and aggregate metrics. It also sequenced opening title → dice →
+   dealing and added independent local wheel/pinch/button zoom. See [architecture](docs/architecture.md)
+   and [capacity audit](docs/capacity-audit.md). **Capacity caveat:** fresh-state 100-game/400-client
+   load passed (3,356 actions, p95 70 ms); ten archived hands per player caused 15-second timeouts
+   and >1 GiB RSS. Sustained capacity needs separate transactional hand archives and updated
+   backup/restore/rollback handling. Do not claim production readiness. `npm run test:load`
+   isolates its store; existing production Compose must be updated on-host for `TRUST_PROXY=1`.
+   Image releases do not replace that file. Previous verification: 100 unit/network, 47 desktop,
+   16 mobile, 5 deployment tests; types/build/formatting and Compose passed. Rules, private hands,
+   actual-win authority, and local camera persistence remain unchanged.
+
 2. **How to play** is now an interactive page with preset switching, tile explanations, a moving
    turn walkthrough, hand grouping/checking, and competing-claim examples. `server/lessons.ts`
    validates separate preset examples through the existing engine in isolated games; scoring,
@@ -129,7 +146,7 @@ Important implementation details:
   must not replay the deal. Mobile WebKit
   tooltips show after a tap finishes; touch `pointerout` previously hid them immediately.
 - `RoomSummary.online` counts connected humans; `phase` describes waiting/playing/results.
-  `client/main.ts` separates live and saved rows. The engine pauses when no humans are connected.
+  `client/main.ts` separates live rooms from this browser profile’s bookmarked paused rooms. The engine pauses when no humans are connected.
 
 ## Rules and past pitfalls
 

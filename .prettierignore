@@ -6,3 +6,6 @@ test-results
 playwright-report
 patches
 package-lock.json
+
+# Generated verbatim by scripts/generate-avatars.ts
+client/generated/avatars

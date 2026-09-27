@@ -16,7 +16,8 @@ import type {
   HandRecord,
   RoomSummary,
 } from '../shared/types';
-import { PRESETS, rulesSchema } from '../shared/rules';
+import { PRESETS } from '../shared/rules';
+import { rulesSchema } from '../shared/rules-schema';
 import {
   applyAction,
   botAction,
@@ -35,7 +36,6 @@ type Session = {
   rulesets: Rules[];
   room: string | null;
   lobby: string;
-  savedTables?: string[];
   history?: HandRecord[];
 };
 type Store = {
@@ -74,6 +74,8 @@ export class GameService {
       if (data.version !== 1) throw new Error('Unsupported saved state version.');
       this.chat = data.chat ?? {};
       for (const s of data.sessions) {
+        // Old server bookmarks must not repopulate another browser's local list.
+        delete (s as Session & { savedTables?: string[] }).savedTables;
         s.lobby ??= 'FOURWN';
         s.rulesets = s.rulesets.map((r) => rulesSchema.parse(r));
         this.sessions.set(s.tokenHash, s);
@@ -302,9 +304,8 @@ export class GameService {
     }
     if (type === 'forget-table') {
       const code = z.string().parse(input);
-      s.savedTables = s.savedTables?.filter((c) => c !== code);
       const r = this.rooms.get(code);
-      if (r) {
+      if (r?.savedBy?.includes(s.profile.id)) {
         r.savedBy = r.savedBy?.filter((id) => id !== s.profile.id);
         if (r.pausedAt && r.game) {
           const elapsed = Date.now() - r.pausedAt;
@@ -449,8 +450,6 @@ export class GameService {
       const r = requireRoom(),
         seat = r.players.findIndex((p) => p.profile.id === s.profile.id);
       if (save) {
-        s.savedTables ??= [];
-        if (!s.savedTables.includes(r.code)) s.savedTables.push(r.code);
         r.savedBy = [...new Set([...(r.savedBy ?? []), s.profile.id])];
         if (r.game && !r.players.some((p, i) => i !== seat && !p.bot)) {
           (r.reservedSeats ??= {})[s.profile.id] = seat;
@@ -606,10 +605,6 @@ export class GameService {
         .filter((l) => l.code === 'FOURWN' || l.host === s.profile.id || l.code === s.lobby)
         .map(lobbyView),
       chat: this.chat[s.lobby] ?? [],
-      savedTables: (s.savedTables ?? []).map((code) => {
-        const r = this.rooms.get(code);
-        return { code, name: r?.name ?? code, lobby: r?.lobby ?? '', available: !!r };
-      }),
       history: (s.history ?? []).map(({ events, result, ...summary }) => summary),
       profile: s.profile,
       rulesets: s.rulesets,

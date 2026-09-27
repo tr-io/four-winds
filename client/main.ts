@@ -1,8 +1,9 @@
 import { HandAnalyzer } from './hand-analysis';
 import { SocialUI, eventLogHTML, gardenHTML } from './social';
+import { SavedTables } from './saved-tables';
 import { avatarImage, avatarAttribution } from './avatars';
 import { AVATAR_CHOICES, avatarChoice } from '../shared/avatars';
-import { LearnPage } from './learn';
+import type { LearnPage } from './learn';
 import '@fontsource/dm-sans/latin-400.css';
 import '@fontsource/dm-sans/latin-500.css';
 import '@fontsource/dm-sans/latin-600.css';
@@ -25,7 +26,7 @@ import {
 } from './table-theme';
 import { io } from 'socket.io-client';
 import type { AppState, GameView, Preset, RoomSummary, Rules } from '../shared/types';
-import { PRESETS, PRESET_DETAILS, rulesSchema } from '../shared/rules';
+import { PRESETS, PRESET_DETAILS } from '../shared/rules';
 import { WINDS, WIND_SYMBOLS, tileName } from '../shared/tiles';
 import { MahjongTable } from './table';
 import { tileStatic } from './tile-art';
@@ -77,6 +78,7 @@ const icon = (name: string, cls = '') =>
   `<svg class="icon ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name] ?? icons.leaf}</svg>`;
 const mark = `<svg class="wind-mark" viewBox="0 0 40 40" aria-hidden="true"><path d="m20 1 6 13 13 6-13 6-6 13-6-13L1 20l13-6Z" fill="currentColor"/><path d="m20 11 3 6 6 3-6 3-3 6-3-6-6-3 6-3Z" fill="var(--paper)"/></svg>`;
 let learnPage: LearnPage | null = null;
+let learnLoad = 0;
 let theme: TableTheme = 'jade-night';
 let themePlayer = '';
 function applyTheme(next: TableTheme) {
@@ -134,6 +136,7 @@ if (isolatedGuest) {
   if (!sessionStorage.getItem('four-winds-guest')) sessionStorage.removeItem('four-winds-token');
   sessionStorage.setItem('four-winds-guest', '1');
 }
+const savedTables = new SavedTables(isolatedGuest ? sessionStorage : localStorage);
 const socket = io({
   auth: {
     token:
@@ -145,7 +148,35 @@ const socket = io({
 app.innerHTML = `<header class="site-header"><button class="brand" data-do="home">${mark}<span>Four Winds<small>MAHJONG ONLINE</small></span></button><nav class="main-nav" aria-label="Main navigation"><button data-page="play" class="active">Play</button><button data-page="rules">Your rulesets</button><button data-page="learn">How to play</button></nav><div class="header-right"><button class="text-button" data-social="chat" aria-label="Open session chat">Chat</button><span class="connection"><i></i><span id="connection-text">Connecting</span></span><button class="profile-button" data-do="profile"><span class="avatar jade" id="header-avatar">G</span><span id="profile-name">Guest</span>${icon('chevron')}</button></div></header><div id="connection-banner" role="status"></div><main id="content"></main><footer class="site-footer"><span>${mark} 東 南 西 北 · FOUR WINDS</span><span>Four players. Three traditions. One table.</span><span class="footer-safe">Play points & fake chips only.</span></footer><div id="toasts" aria-live="polite"></div><dialog id="modal"></dialog>`;
 const content = document.querySelector<HTMLElement>('#content')!;
 const modal = document.querySelector<HTMLDialogElement>('#modal')!;
-const social = new SocialUI(command, openDialog, () => table, toast);
+const social = new SocialUI(
+  command,
+  openDialog,
+  () => table,
+  toast,
+  () => (state ? savedTables.list(state) : []),
+  async (code) => {
+    if (!state) return;
+    try {
+      savedTables.remove(state.profile.id, code);
+    } catch (error) {
+      toast((error as Error).message, true);
+      throw error;
+    }
+    render();
+    // Release this profile's reservation after removing the local bookmark.
+    if (connected) await command('forget-table', code);
+  },
+);
+window.addEventListener('storage', (event) => {
+  if (
+    !isolatedGuest &&
+    state &&
+    (event.key === null || event.key === savedTables.key(state.profile.id))
+  ) {
+    render();
+    if (activeDialog === 'saved-tables') social.showSaved();
+  }
+});
 function toast(text: string, error = false) {
   const t = document.createElement('div');
   t.className = `toast ${error ? 'error' : ''}`;
@@ -282,6 +313,7 @@ function connectionUI() {
     : `<div class="reconnect-banner">${icon('globe')} Connecting to the table. Your seat will be restored automatically.</div>`;
 }
 function disposeTable() {
+  learnLoad++;
   learnPage?.dispose();
   learnPage = null;
   rack?.dispose();
@@ -292,6 +324,19 @@ function disposeTable() {
   lastVisual = '';
   table?.dispose();
   table = null;
+}
+async function loadLessons() {
+  const version = ++learnLoad;
+  const current = () => version === learnLoad && mounted === 'learn' && !state?.room;
+  content.innerHTML = '<section class="empty-tables" role="status">Loading lessons…</section>';
+  try {
+    const { LearnPage } = await import('./learn');
+    if (current()) learnPage = new LearnPage(content, command);
+  } catch {
+    if (current())
+      content.innerHTML =
+        '<section class="empty-tables"><p role="alert">Lessons could not load. Check your connection and reload the page.</p><button class="button outline" data-do="reload">Reload page</button><button class="text-button" data-page="play">Back to play</button></section>';
+  }
 }
 function mountScene(id: string, preview: boolean) {
   try {
@@ -318,11 +363,11 @@ function render() {
     if (page === 'play') {
       content.innerHTML = lobbyHTML();
       mountScene('hero-table', true);
-    } else if (page === 'learn') learnPage = new LearnPage(content, command);
+    } else if (page === 'learn') void loadLessons();
   }
   if (page === 'play') {
     const live = state?.rooms.filter((r) => r.online > 0).length ?? 0;
-    const saved = (state?.rooms.length ?? 0) - live;
+    const saved = savedLobbyRooms().length;
     document.querySelector('#lobby-label')!.textContent =
       state?.lobby.name ?? 'The Four Winds Club';
     document.querySelector('#lobby-presence')!.textContent = state
@@ -352,7 +397,7 @@ function renderRoomList() {
   if (!element) return;
   const rooms = state?.rooms ?? [];
   const live = rooms.filter((r) => r.online > 0);
-  const saved = rooms.filter((r) => !r.online);
+  const saved = savedLobbyRooms();
   const savedOpen = element.querySelector<HTMLDetailsElement>('.saved-tables')?.open;
   const row = (r: RoomSummary) => {
     const status = !r.online
@@ -366,7 +411,12 @@ function renderRoomList() {
             : 'Playing';
     return `<div class="room-row"><div><strong>${esc(r.name)}</strong><small>${status} · ${r.online} online</small></div><span class="rule-pill ${r.preset}">${esc(r.rulesName)}</span><span class="seat-count">${icon('users')} ${r.humans}/4 <small>${r.bots ? `+ ${r.bots} bots` : 'Human seats'}</small></span><button class="icon-button" data-join="${r.code}" aria-label="Join ${esc(r.name)}" ${r.humans === 4 ? 'disabled' : ''}>${icon('arrow')}</button></div>`;
   };
-  element.innerHTML = `<div id="live-room-list">${live.length ? live.map(row).join('') : `<div class="empty-tables"><div class="empty-icon">${icon('users')}</div><div><strong>No live tables.</strong><p>Create one and invite your people. Bots can keep you company.</p></div><button class="button outline small" data-do="create">Open a table ${icon('plus')}</button></div>`}</div>${saved.length ? `<details class="saved-tables" ${savedOpen ? 'open' : ''}><summary>Saved tables · ${saved.length}</summary><p>No players online. Hands are saved for reconnecting.</p>${saved.map(row).join('')}</details>` : ''}`;
+  element.innerHTML = `<div id="live-room-list">${live.length ? live.map(row).join('') : `<div class="empty-tables"><div class="empty-icon">${icon('users')}</div><div><strong>No live tables.</strong><p>Create one and invite your people. Bots can keep you company.</p></div><button class="button outline small" data-do="create">Open a table ${icon('plus')}</button></div>`}</div>${saved.length ? `<details class="saved-tables" ${savedOpen ? 'open' : ''}><summary>Saved tables · ${saved.length}</summary><p>Your bookmarks in this browser. No players online.</p>${saved.map(row).join('')}</details>` : ''}`;
+}
+function savedLobbyRooms() {
+  if (!state) return [];
+  const codes = new Set(savedTables.read(state.profile.id).map((r) => r.code));
+  return state.rooms.filter((r) => !r.online && codes.has(r.code));
 }
 function roomShell() {
   return `<section class="game-window" aria-label="Mahjong game window">
@@ -609,7 +659,7 @@ function renderGame(g: GameView) {
       const relative = (i - g.seat + 4) % 4,
         active = playing && g.turn === i,
         newcomer = arrived.includes(p);
-      return `<button type="button" data-inspect-seat="${i}" aria-haspopup="dialog" aria-label="Inspect ${esc(p.profile.name)} tiles" class="player-badge position-${relative} ${active ? 'current-player' : ''} ${newcomer ? 'player-arrival' : ''}" style="--arrival-delay:${relative * 110}ms">${avatarHTML(p.profile.name, p.profile.avatar, p.bot)}<span><strong class="player-name">${esc(p.profile.name)} ${i === g.seat ? '<em>you</em>' : ''}</strong><small>${p.riichi ? '<b class="riichi-badge">RIICHI</b> ' : ''}${g.rules.points ? `${p.points.toLocaleString()} pts` : p.bot ? 'Bot' : p.connected ? 'Connected' : 'Reconnecting'}${g.rules.chips ? ` · ${p.chips.toLocaleString()} chips` : ''}</small></span><span class="seat-wind" aria-label="${WINDS[(i - g.dealer + 4) % 4]} seat">${WIND_SYMBOLS[(i - g.dealer + 4) % 4]}<small>${WINDS[(i - g.dealer + 4) % 4]}</small></span>${active ? `<span class="seat-turn">TURN</span><span class="seat-timer" data-countdown="${g.turnDeadline}"></span>` : ''}${!p.bot ? `<i class="seat-online ${p.connected ? '' : 'away'}"></i>` : ''}</button>`;
+      return `<button type="button" data-inspect-seat="${i}" aria-haspopup="dialog" aria-label="Inspect ${esc(p.profile.name)} tiles" ${!p.bot ? `aria-describedby="seat-presence-${i}"` : ''} class="player-badge position-${relative} ${active ? 'current-player' : ''} ${newcomer ? 'player-arrival' : ''}" style="--arrival-delay:${relative * 110}ms">${avatarHTML(p.profile.name, p.profile.avatar, p.bot)}<span><strong class="player-name">${esc(p.profile.name)} ${i === g.seat ? '<em>you</em>' : ''}</strong><small>${p.riichi ? '<b class="riichi-badge">RIICHI</b> ' : ''}${g.rules.points ? `${p.points.toLocaleString()} pts` : p.bot ? 'Bot' : p.connected ? 'Connected' : 'Reconnecting'}${g.rules.chips ? ` · ${p.chips.toLocaleString()} chips` : ''}</small></span><span class="seat-wind" aria-label="${WINDS[(i - g.dealer + 4) % 4]} seat">${WIND_SYMBOLS[(i - g.dealer + 4) % 4]}<small>${WINDS[(i - g.dealer + 4) % 4]}</small></span>${active ? `<span class="seat-turn">TURN</span><span class="seat-timer" data-countdown="${g.turnDeadline}"></span>` : ''}${!p.bot ? `<span class="seat-online ${p.connected ? '' : 'away'}"><span aria-hidden="true">${p.connected ? '✓' : '−'}</span><span class="presence-tooltip" id="seat-presence-${i}" role="tooltip">${p.connected ? 'Online' : 'Offline'}</span></span>` : ''}</button>`;
     })
     .join('');
   knownPlayers = new Set(g.players.map((p) => p.profile.id));
@@ -879,7 +929,7 @@ function showProfile() {
   openDialog(
     'profile',
     'A familiar face.',
-    `<form id="profile-form"><div class="profile-preview">${avatarHTML(p.name, p.avatar)}<div><strong>Your place in the club</strong><small>${p.hands} hands played · ${p.wins} wins</small></div></div><label>DISPLAY NAME<input name="name" maxlength="24" value="${esc(p.name)}" required/></label><label>CHOOSE YOUR AVATAR</label><div class="avatar-picker dicebear-picker">${AVATAR_CHOICES.map((c) => `<label><input type="radio" name="avatar" value="${c}" ${avatarChoice(p.avatar) === c ? 'checked' : ''}/>${avatarHTML(p.name, c)}<small>${c.split(':')[0]} ${Number(c.split(':')[1]) + 1}</small></label>`).join('')}</div>${avatarAttribution}<p class="form-note">Your profile, history and saved tables live on the server. This browser saves the credential that reconnects you to them.</p><div class="profile-shortcuts"><button type="button" class="button outline" data-social="history">Hand history</button><button type="button" class="button outline" data-social="saved">Saved tables</button></div><button class="button primary full">Save profile ${icon('check')}</button></form>`,
+    `<form id="profile-form"><div class="profile-preview">${avatarHTML(p.name, p.avatar)}<div><strong>Your place in the club</strong><small>${p.hands} hands played · ${p.wins} wins</small></div></div><label>DISPLAY NAME<input name="name" maxlength="24" value="${esc(p.name)}" required/></label><label>CHOOSE YOUR AVATAR</label><div class="avatar-picker dicebear-picker">${AVATAR_CHOICES.map((c) => `<label><input type="radio" name="avatar" value="${c}" ${avatarChoice(p.avatar) === c ? 'checked' : ''}/>${avatarHTML(p.name, c)}<small>${c.split(':')[0]} ${Number(c.split(':')[1]) + 1}</small></label>`).join('')}</div>${avatarAttribution}<p class="form-note">Your saved tables are bookmarked in this browser for your profile. Your profile and hand history stay on the server; this browser keeps your reconnect credential.</p><div class="profile-shortcuts"><button type="button" class="button outline" data-social="history">Hand history</button><button type="button" class="button outline" data-social="saved">Saved tables</button></div><button class="button primary full">Save profile ${icon('check')}</button></form>`,
   );
 }
 function showLobbies() {
@@ -1139,6 +1189,9 @@ app.addEventListener('click', async (e) => {
       return;
     }
     switch (button.dataset.do) {
+      case 'reload':
+        location.reload();
+        break;
       case 'table-settings':
         showTableSettings();
         break;
@@ -1277,12 +1330,26 @@ app.addEventListener('click', async (e) => {
         );
         break;
       case 'save-leave':
-      case 'confirm-leave':
+      case 'confirm-leave': {
+        if (button.dataset.do === 'save-leave' && state?.room) {
+          try {
+            // Write before leaving so a lost acknowledgment cannot lose the bookmark.
+            savedTables.save(state.profile.id, {
+              code: state.room.code,
+              name: state.room.name,
+              lobby: state.lobby.code,
+            });
+          } catch (error) {
+            toast((error as Error).message, true);
+            break;
+          }
+        }
         await command('leave', { save: button.dataset.do === 'save-leave' });
         closeDialog();
         mounted = '';
         render();
         break;
+      }
       case 'add-bonus':
         readRulesForm();
         if (editing!.houseBonuses.length >= 8) {
@@ -1378,8 +1445,21 @@ modal.addEventListener('submit', async (e) => {
         await command('join-lobby', data.get('code'));
         break;
       case 'rules-form': {
+        let schema;
+        try {
+          schema = (await import('../shared/rules-schema')).rulesSchema;
+        } catch {
+          toast(
+            'Could not check these rules. Check your connection and reload before trying again.',
+            true,
+          );
+          if (submit) submit.disabled = false;
+          return;
+        }
+        // A slow download must not submit a replaced form or close a different dialog.
+        if (!form.isConnected || !modal.open) return;
         readRulesForm();
-        const checked = rulesSchema.safeParse(editing);
+        const checked = schema.safeParse(editing);
         if (!checked.success) {
           toast(checked.error.issues[0].message, true);
           if (submit) submit.disabled = false;

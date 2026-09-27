@@ -32,7 +32,7 @@ A complete MCR hand still needs eight fan before flowers. Click its qualificatio
 
 - **Create a lobby** to group your tables under one invitation code, or use the shared Four Winds Club.
 - **Create a table** with Chinese MCR, Japanese Riichi, Singapore, or a saved house ruleset.
-- Tables appear under **Live tables** while a human player is connected. Disconnected rooms remain in **Saved tables** for reconnecting. A fresh server creates no default tables.
+- Tables appear under **Live tables** while a human player is connected. **Saved tables** shows only paused tables bookmarked with **Save and leave** by your profile in this browser. A fresh server creates no default tables.
 - Choose **Fill empty seats with bots** to start immediately. Otherwise, invite players and let the host start when all four seats are filled. The host can add bots in the waiting room.
 - A joining friend replaces the first bot seat and inherits its hand and score. A player who leaves is replaced by a bot.
 - Draws arrive automatically. Select a tile and press **Discard**. All available win and meld claims appear as buttons, including each legal chow sequence.
@@ -53,6 +53,7 @@ The ruleset editor changes actual legal actions, timing, winning thresholds, set
 ## Test and deploy
 
 - **[Architecture](docs/architecture.md)** — system, command, worker, and deployment diagrams.
+- **[Browser performance](docs/browser-performance.md)** — bundle sizes, avatar generation, and reproducible mobile startup measurements.
 - **[Capacity audit](docs/capacity-audit.md)** — 50/100-game measurements and the remaining archival-storage blocker.
 - **[TESTING.md](TESTING.md)** — local setup, four players on one computer, phones on a LAN, remote groups, reconnects, bot takeover, and automated checks.
 - **[docs/game-state-testing.md](docs/game-state-testing.md)** — targeted commands and scenarios for starts, draws, claims, wins, exhaustion, scoring, and network state.

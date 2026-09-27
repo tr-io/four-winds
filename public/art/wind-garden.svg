@@ -24,5 +24,5 @@
   <path d="M975 52v99m-20-92v84m40-84v84" stroke="#824b2c" stroke-opacity=".3"/>
   <path d="m975 78 7 18 18 7-18 7-7 19-7-19-18-7 18-7Z" stroke="#523e2c" stroke-width="2"/>
   <path d="M975 153v19m-4-4h8" stroke="#e29d65" stroke-width="3"/>
-  <g fill="#ffad76"><circle cx="754" cy="93" r="2"/><circle cx="632" cy="195" r="2"/><circle cx="1040" cy="225" r="2"/><path d="m1160 408 4 7 8 2-8 3-4 8-3-8-8-3 8-2Z"/></g>
+  <path fill="#ffad76" d="m1160 408 4 7 8 2-8 3-4 8-3-8-8-3 8-2Z"/>
 </svg>

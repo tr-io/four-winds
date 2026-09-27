@@ -17,13 +17,12 @@
     "format:check": "prettier --check .",
     "test:mobile": "playwright test --config playwright.mobile.config.ts",
     "test:deploy": "python3 -m unittest discover -s tests/deploy -v",
-    "test:state": "vitest run tests/game-state.test.ts tests/engine.test.ts tests/hand-analysis.test.ts"
+    "test:state": "vitest run tests/game-state.test.ts tests/engine.test.ts tests/hand-analysis.test.ts",
+    "avatars:generate": "node --import tsx scripts/generate-avatars.ts",
+    "avatars:check": "node --import tsx scripts/generate-avatars.ts --check",
+    "measure:startup": "node --import tsx scripts/measure-startup.ts"
   },
   "dependencies": {
-    "@dicebear/adventurer": "^9.4.3",
-    "@dicebear/adventurer-neutral": "^9.4.3",
-    "@dicebear/bottts": "^9.4.3",
-    "@dicebear/core": "^9.4.3",
     "@fontsource/cormorant-garamond": "^5.3.0",
     "@fontsource/dm-sans": "^5.3.0",
     "@kobalab/majiang-core": "^1.4.1",
@@ -38,6 +37,10 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@dicebear/adventurer": "^9.4.3",
+    "@dicebear/adventurer-neutral": "^9.4.3",
+    "@dicebear/bottts": "^9.4.3",
+    "@dicebear/core": "^9.4.3",
     "@playwright/test": "^1.63.0",
     "@types/express": "^5.0.6",
     "@types/node": "^26.6.3",

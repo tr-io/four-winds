@@ -255,7 +255,6 @@ export type RoomView = {
 };
 export type AppState = {
   chat?: ChatMessage[];
-  savedTables?: SavedTable[];
   history?: Omit<HandRecord, 'events' | 'result'>[];
   lobby: LobbyView;
   lobbies: LobbyView[];

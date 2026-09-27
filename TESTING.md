@@ -150,6 +150,9 @@ npm test
 # Type check and production client build
 npm run build
 
+# Verify the checked-in avatars match their fixed generator settings
+npm run avatars:check
+
 # Real Chromium interactions: profiles, custom rules, lobby/room creation,
 # four players, turns, reconnect, bots, mobile, safe text, reduced motion,
 # dragging, MCR qualification, grouped discards, claims and win effects,
@@ -164,6 +167,9 @@ npm run test:mobile
 # Restricted deployment commands, health checks, recovery, state-version guard
 npm run test:deploy
 ```
+
+See [browser performance](docs/browser-performance.md) for the optional throttled startup
+benchmark. Run it separately from the browser suites so CPU contention does not skew timings.
 
 Engine tests use fixed seeds, physical tile-conservation checks, and scoring fixtures. Production tables use a cryptographic shuffle rather than exposing or reusing test seeds. Browser tests start their own production-build server on **3101** and use `test-results/browser-state.json`; they do not use the main game data file. The table-window scenarios also launch isolated in-memory services on random local ports and install deterministic hands directly in those test services. There is no fixture endpoint or game-state override in the deployed app. Playwright saves screenshots and traces on failure.
 
@@ -183,7 +189,7 @@ npx playwright test --headed
 
 ## 8. Troubleshooting
 
-- **Old practice tables after restarting:** the server restores `data/four-winds.json`. No rooms are created by default. **Live tables** contains rooms with connected humans; **Saved tables** holds paused rooms with nobody online. Bots do not count as online players. Open the saved section to join an available bot seat, or return with the original browser identity to resume your own seat.
+- **Old practice tables after restarting:** the server restores `data/four-winds.json`. No rooms are created by default. **Live tables** contains rooms with connected humans; **Saved tables** only lists this browser profile's bookmarked paused rooms. Use **Save and leave** to create a local bookmark, then resume in the same browser. Another browser or isolated guest must not inherit that list. Bots do not count as online players. Old server-only bookmarks are no longer listed; an existing table can still be joined by invitation code.
 
 - **Blank page with module MIME errors or `504 Outdated Optimize Dep`:** restart `npm run dev`, then reload the page. If it persists, stop the server, remove only `.cache/vite`, and restart. Four Winds keeps [Vite's dependency cache](https://vite.dev/config/shared-options.html#cachedir) outside `node_modules` because [`npm ci` replaces that directory](https://docs.npmjs.com/cli/v11/commands/npm-ci/). Keep `data/` and browser storage to preserve games and profiles.
 - **Wrong website on localhost:** another development service may own that port. Change Vite's port and use the printed URL. The original workspace had unrelated services on 5173 and 5174.

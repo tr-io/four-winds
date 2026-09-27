@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { PRESETS, rulesSchema } from '../shared/rules';
+import { PRESETS } from '../shared/rules';
+import { rulesSchema } from '../shared/rules-schema';
 import { kind, makeWall } from '../shared/tiles';
 import type { Game, Preset, Rules, Tile } from '../shared/types';
 import {

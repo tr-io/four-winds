@@ -59,7 +59,8 @@ volume. Current backups copy `four-winds.json`; this matters before changing the
 | `client/table.ts`, `hand-rack.ts`               | Cosmetic table and interactive tile rack                                       |
 | `client/hand-analysis.ts`, `analysis-worker.ts` | Cancellable local route analysis                                               |
 | `shared/analysis-view.ts`                       | Convert a public seat view to an ordinary self-draw analysis scenario          |
-| `shared/types.ts`, `rules.ts`, `tiles.ts`       | Protocol, domain types, presets, validation, tile identities                   |
+| `shared/types.ts`, `rules.ts`, `tiles.ts`       | Protocol, domain types, presets, tile identities                               |
+| `shared/rules-schema.ts`                        | Shared validation; downloaded by the browser when submitting edited rules      |
 | `server/service.ts`                             | Authentication, sessions, lobbies, tables, delivery, storage, bot scheduling   |
 | `server/engine.ts`                              | Authoritative state transitions and legal actions                              |
 | `server/scoring.ts`, `shapes.ts`                | Pure scoring/shape logic, also bundled into the analysis worker                |
@@ -180,7 +181,9 @@ advance the authoritative engine.
 - Full completed-hand histories are capped at 100 per profile, but are still embedded in every
   snapshot and held in memory. This is the main remaining capacity blocker.
 - On load, human seats are marked disconnected. A returning credential restores the seat.
-  Saved tables preserve seats; there is no password recovery or account federation.
+  Saved tables preserve seats on the server, while bookmarks live in browser storage keyed by
+  profile ID. The lobby intersects paused rooms with that local list. There is no password
+  recovery or account federation.
 - `TRUST_PROXY=1` is enabled only in the private Caddy deployment. The handshake limiter then
   uses the rightmost valid `X-Forwarded-For` address. Direct deployments ignore that header by
   default. Caddy normally overwrites untrusted forwarding headers; see its
