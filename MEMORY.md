@@ -6,8 +6,9 @@ before relying on the snapshot. Start with the user's latest request.
 ## Resume here
 
 1. Current work is on **`feat/social-table-experience`**, based on merged UI PR #1 (`65fb71e`).
-   The user requested social/table features and an interactive How to Play page. PR creation
-   is the final publishing step; check Git and CI before relying on this snapshot.
+   Pushed as [PR #2](https://github.com/tr-io/four-winds/pull/2). The user requested social/table
+   features and an interactive How to Play page. Local verification passed; GitHub CI is running.
+   Check Git and CI before relying on this snapshot.
 2. **How to play** is now an interactive page with preset switching, tile explanations, a moving
    turn walkthrough, hand grouping/checking, and competing-claim examples. `server/lessons.ts`
    validates separate preset examples through the existing engine in isolated games; scoring,
