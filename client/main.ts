@@ -1,3 +1,7 @@
+import { SocialUI, eventLogHTML, gardenHTML } from './social';
+import { avatarImage, avatarAttribution } from './avatars';
+import { AVATAR_CHOICES, avatarChoice } from '../shared/avatars';
+import { LearnPage } from './learn';
 import '@fontsource/dm-sans/latin-400.css';
 import '@fontsource/dm-sans/latin-500.css';
 import '@fontsource/dm-sans/latin-600.css';
@@ -9,6 +13,7 @@ import './style.css';
 import './game.css';
 import './refinements.css';
 import './themes.css';
+import './experience.css';
 import {
   TABLE_THEMES,
   isTableTheme,
@@ -69,6 +74,7 @@ const icons: Record<string, string> = {
 const icon = (name: string, cls = '') =>
   `<svg class="icon ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name] ?? icons.leaf}</svg>`;
 const mark = `<svg class="wind-mark" viewBox="0 0 40 40" aria-hidden="true"><path d="m20 1 6 13 13 6-13 6-6 13-6-13L1 20l13-6Z" fill="currentColor"/><path d="m20 11 3 6 6 3-6 3-3 6-3-6-6-3 6-3Z" fill="var(--paper)"/></svg>`;
+let learnPage: LearnPage | null = null;
 let theme: TableTheme = 'jade-night';
 let themePlayer = '';
 function applyTheme(next: TableTheme) {
@@ -84,7 +90,9 @@ function themeSettingsHTML() {
       ([id, t]) =>
         `<button type="button" class="theme-option" data-theme-choice="${id}" aria-pressed="${theme === id}"><span class="theme-swatch ${id}" aria-hidden="true">東 <i>✦</i> 南</span><strong>${t.name}</strong><small>${t.description}</small></button>`,
     )
-    .join('')}</div><span class="sr-only" id="theme-announcement" role="status"></span></section>`;
+    .join(
+      '',
+    )}</div><span class="sr-only" id="theme-announcement" role="status"></span></section>${social.settingsHTML()}`;
 }
 let state: AppState | null = null,
   page: 'play' | 'rules' | 'learn' = 'play',
@@ -132,9 +140,10 @@ const socket = io({
   },
   reconnection: true,
 });
-app.innerHTML = `<header class="site-header"><button class="brand" data-do="home">${mark}<span>Four Winds<small>MAHJONG ONLINE</small></span></button><nav class="main-nav" aria-label="Main navigation"><button data-page="play" class="active">Play</button><button data-page="rules">Your rulesets</button><button data-page="learn">How to play</button></nav><div class="header-right"><span class="connection"><i></i><span id="connection-text">Connecting</span></span><button class="profile-button" data-do="profile"><span class="avatar jade" id="header-avatar">G</span><span id="profile-name">Guest</span>${icon('chevron')}</button></div></header><div id="connection-banner" role="status"></div><main id="content"></main><footer class="site-footer"><span>${mark} 東 南 西 北 · FOUR WINDS</span><span>Four players. Three traditions. One table.</span><span class="footer-safe">Play points & fake chips only.</span></footer><div id="toasts" aria-live="polite"></div><dialog id="modal"></dialog>`;
+app.innerHTML = `<header class="site-header"><button class="brand" data-do="home">${mark}<span>Four Winds<small>MAHJONG ONLINE</small></span></button><nav class="main-nav" aria-label="Main navigation"><button data-page="play" class="active">Play</button><button data-page="rules">Your rulesets</button><button data-page="learn">How to play</button></nav><div class="header-right"><button class="text-button" data-social="chat" aria-label="Open session chat">Chat</button><span class="connection"><i></i><span id="connection-text">Connecting</span></span><button class="profile-button" data-do="profile"><span class="avatar jade" id="header-avatar">G</span><span id="profile-name">Guest</span>${icon('chevron')}</button></div></header><div id="connection-banner" role="status"></div><main id="content"></main><footer class="site-footer"><span>${mark} 東 南 西 北 · FOUR WINDS</span><span>Four players. Three traditions. One table.</span><span class="footer-safe">Play points & fake chips only.</span></footer><div id="toasts" aria-live="polite"></div><dialog id="modal"></dialog>`;
 const content = document.querySelector<HTMLElement>('#content')!;
 const modal = document.querySelector<HTMLDialogElement>('#modal')!;
+const social = new SocialUI(command, openDialog, () => table, toast);
 function toast(text: string, error = false) {
   const t = document.createElement('div');
   t.className = `toast ${error ? 'error' : ''}`;
@@ -177,6 +186,7 @@ socket.on('connect', () => {
   connectionUI();
 });
 socket.on('disconnect', () => {
+  social.disconnected();
   connected = false;
   connectionUI();
 });
@@ -194,18 +204,19 @@ socket.on('state', (next: AppState) => {
     applyTheme(readTableTheme(themePlayer));
   }
   const avatar = document.querySelector('#header-avatar')!;
-  avatar.className = `avatar ${state.profile.avatar}`;
-  avatar.textContent = state.profile.name.slice(0, 1);
+  avatar.className = 'avatar dicebear-avatar';
+  avatar.innerHTML = `<img src="${avatarImage(state.profile.avatar)}" alt=""/>`;
   document.querySelector('#profile-name')!.textContent = state.profile.name;
   if (state.room) page = 'play';
   render();
+  social.update(next);
   const g = state.room?.game;
   if (g) {
     const dealKey = freshDealKey(state.room!.code, g, next.serverTime);
     if (dealKey && sessionStorage.getItem('four-winds-last-deal') !== dealKey) {
       sessionStorage.setItem('four-winds-last-deal', dealKey);
       table?.deal(g);
-      effects?.deal(g.handNumber);
+      effects?.deal(g);
       tone('start');
     }
     if (!g.result && activeDialog === 'result') closeDialog();
@@ -263,6 +274,8 @@ function connectionUI() {
     : `<div class="reconnect-banner">${icon('globe')} Connecting to the table. Your seat will be restored automatically.</div>`;
 }
 function disposeTable() {
+  learnPage?.dispose();
+  learnPage = null;
   rack?.dispose();
   rack = null;
   effects?.dispose();
@@ -297,7 +310,7 @@ function render() {
     if (page === 'play') {
       content.innerHTML = lobbyHTML();
       mountScene('hero-table', true);
-    } else if (page === 'learn') content.innerHTML = learnHTML();
+    } else if (page === 'learn') learnPage = new LearnPage(content, command);
   }
   if (page === 'play') {
     const live = state?.rooms.filter((r) => r.online > 0).length ?? 0;
@@ -349,11 +362,11 @@ function renderRoomList() {
 }
 function roomShell() {
   return `<section class="game-window" aria-label="Mahjong game window">
-    <header class="game-toolbar"><button class="icon-button" data-do="leave" aria-label="Leave table">${icon('back')}</button><div class="game-wordmark">四風 <span>FOUR WINDS</span></div><div class="table-title"><strong id="room-title"></strong><button id="room-rules" class="rule-pill" data-do="table-settings" aria-label="Table rules"></button></div><div class="game-tools"><span class="game-connection" data-link-state>${connected ? 'LIVE' : 'RECONNECTING'}</span><button class="text-button room-code-button" data-do="share-room" aria-label="Copy table invitation">${icon('copy')} <span id="room-code"></span></button><button class="icon-button" data-do="table-settings" aria-label="Table settings">${icon('settings')}</button><button class="icon-button" data-do="log" aria-label="Game log" aria-expanded="false">${icon('clock')}</button><button class="icon-button" data-do="sound" aria-label="Toggle game sounds">${icon(sound ? 'sound' : 'mute')}</button><button class="icon-button" data-do="help" aria-label="Table help">${icon('book')}</button><button class="icon-button fullscreen-button" data-do="fullscreen" aria-label="Toggle fullscreen">${icon('diagonal')}</button></div></header>
-    <div class="board-area"><div class="game-table table-entrance"><div class="table-grain"></div><div class="game-meta" id="game-meta"></div><div id="live-table"></div><div id="seat-overlays"></div><div id="table-status"></div><div id="recent-actions" class="recent-actions" aria-label="Last table actions"></div><div id="table-effects" aria-live="polite"></div>
+    <header class="game-toolbar"><button class="icon-button" data-do="leave" aria-label="Leave table">${icon('back')}</button><div class="game-wordmark">四風 <span>FOUR WINDS</span></div><div class="table-title"><strong id="room-title"></strong><button id="room-rules" class="rule-pill" data-do="table-settings" aria-label="Table rules"></button></div><div class="game-tools"><button class="text-button" data-social="chat" aria-label="Open table chat">Chat</button><span class="game-connection" data-link-state>${connected ? 'LIVE' : 'RECONNECTING'}</span><button class="text-button room-code-button" data-do="share-room" aria-label="Copy table invitation">${icon('copy')} <span id="room-code"></span></button><button class="icon-button" data-do="table-settings" aria-label="Table settings">${icon('settings')}</button><button class="icon-button" data-do="log" aria-label="Game log" aria-expanded="false">${icon('clock')}</button><button class="icon-button" data-do="sound" aria-label="Toggle game sounds">${icon(sound ? 'sound' : 'mute')}</button><button class="icon-button" data-do="help" aria-label="Table help">${icon('book')}</button><button class="icon-button fullscreen-button" data-do="fullscreen" aria-label="Toggle fullscreen">${icon('diagonal')}</button></div></header>
+    <div class="board-area">${gardenHTML}<div class="game-table table-entrance"><div class="table-grain"></div><div class="game-meta" id="game-meta"></div><div id="live-table"></div><div id="seat-overlays"></div><div id="table-status"></div><div id="recent-actions" class="recent-actions" aria-label="Last table actions"></div><div id="table-effects" aria-live="polite"></div>
       <div class="discard-inspector" id="discard-inspector"><button class="discard-trigger" data-do="discards" aria-label="Show discarded tiles" aria-expanded="false" aria-controls="discard-ledger" aria-pressed="false"><span>河</span><small>DISCARDS</small></button><section class="discard-ledger" id="discard-ledger" aria-label="Discarded tiles" hidden><header><div><strong>Discard ledger</strong><small>All seats · sorted by suit and rank</small></div><button class="icon-button" data-do="close-discards" aria-label="Close discarded tiles">${icon('close')}</button></header><div id="discard-groups"></div><p>Counts include called tiles. “Called” tiles are now in exposed melds.</p></section></div>
     </div><aside class="game-drawer" id="game-drawer" hidden><header><strong>TABLE RECORD</strong><button class="icon-button" data-do="log" aria-label="Close game log">${icon('close')}</button></header><div id="table-sidebar"></div><div id="log-entries" role="log" aria-label="Game log"></div></aside></div>
-    <section id="hand-area" class="game-dock" aria-label="Your hand and actions"><div id="waiting-controls"></div><div id="playing-controls"><div id="action-dock"></div><div id="round-transition"></div><div class="hand-header"><div id="hand-guidance"></div><div class="rack-tools"><button class="hand-insight-button" id="hand-shape" data-do="hand-detail" aria-label="Inspect your hand"></button><span class="your-wind" id="your-wind"></span><button class="text-button" data-do="sort" aria-label="Sort tiles by suit and rank">Sort tiles ${icon('chevron')}</button></div></div><p id="rack-instructions" class="sr-only">Drag to arrange your tiles. With a tile focused, use Alt and Left or Right to move it. Select a playable tile, then press Discard.</p><div class="hand-tiles" role="group" aria-label="Your concealed tiles"></div><div id="exposed-hand" class="exposed-hand"></div><span class="sr-only" id="rack-announcement" role="status"></span></div></section>
+    <section id="hand-area" class="game-dock" aria-label="Your hand and actions"><div id="waiting-controls"></div><div id="playing-controls"><div id="action-dock"></div><div id="round-transition"></div><div class="hand-header"><div id="hand-guidance"></div><div class="rack-tools"><button class="hand-insight-button" id="hand-shape" data-do="hand-detail" aria-label="Inspect your hand"></button><span class="your-wind" id="your-wind"></span><button class="text-button" data-do="sort" aria-label="Sort tiles by suit and rank">Sort tiles ${icon('chevron')}</button></div></div><p id="rack-instructions" class="sr-only">Drag to arrange your tiles. With a tile focused, use Alt and Left or Right to move it. Select a playable tile, then press Discard.</p><div class="hand-tiles" role="group" aria-label="Your concealed tiles"></div><div id="discard-queue" class="discard-queue"></div><div id="exposed-hand" class="exposed-hand"></div><span class="sr-only" id="rack-announcement" role="status"></span></div></section>
   </section>`;
 }
 function renderRoom() {
@@ -546,8 +559,8 @@ function renderLastActions(g: GameView) {
   );
 }
 
-function avatarHTML(name: string, color: string, bot = false) {
-  return `<span class="avatar ${color}">${bot ? icon('bot') : esc(name.slice(0, 1).toUpperCase())}</span>`;
+function avatarHTML(name: string, choice: string, bot = false) {
+  return `<span class="avatar dicebear-avatar"><img src="${avatarImage(choice)}" alt="${bot ? 'Bot avatar' : ''}"/></span>`;
 }
 function renderWaiting() {
   const room = state!.room!;
@@ -585,7 +598,7 @@ function renderGame(g: GameView) {
       const relative = (i - g.seat + 4) % 4,
         active = playing && g.turn === i,
         newcomer = arrived.includes(p);
-      return `<div class="player-badge position-${relative} ${active ? 'current-player' : ''} ${newcomer ? 'player-arrival' : ''}" style="--arrival-delay:${relative * 110}ms">${avatarHTML(p.profile.name, p.profile.avatar, p.bot)}<div><strong title="${esc(p.profile.name)}">${esc(p.profile.name)} ${i === g.seat ? '<em>you</em>' : ''}</strong><small>${p.riichi ? '<b class="riichi-badge">RIICHI</b> ' : ''}${g.rules.points ? `${p.points.toLocaleString()} pts` : p.bot ? 'Bot' : p.connected ? 'Connected' : 'Reconnecting'}${g.rules.chips ? ` · ${p.chips.toLocaleString()} chips` : ''}</small></div><span class="seat-wind" aria-label="${WINDS[(i - g.dealer + 4) % 4]} seat">${WIND_SYMBOLS[(i - g.dealer + 4) % 4]}<small>${WINDS[(i - g.dealer + 4) % 4]}</small></span>${active ? `<span class="seat-turn">TURN</span><span class="seat-timer" data-countdown="${g.turnDeadline}"></span>` : ''}${!p.bot ? `<i class="seat-online ${p.connected ? '' : 'away'}"></i>` : ''}</div>`;
+      return `<div class="player-badge position-${relative} ${active ? 'current-player' : ''} ${newcomer ? 'player-arrival' : ''}" style="--arrival-delay:${relative * 110}ms">${avatarHTML(p.profile.name, p.profile.avatar, p.bot)}<div><strong><button class="player-name-button" data-inspect-seat="${i}" aria-label="Inspect ${esc(p.profile.name)} melds">${esc(p.profile.name)} ${i === g.seat ? '<em>you</em>' : ''}</button></strong><small>${p.riichi ? '<b class="riichi-badge">RIICHI</b> ' : ''}${g.rules.points ? `${p.points.toLocaleString()} pts` : p.bot ? 'Bot' : p.connected ? 'Connected' : 'Reconnecting'}${g.rules.chips ? ` · ${p.chips.toLocaleString()} chips` : ''}</small></div><span class="seat-wind" aria-label="${WINDS[(i - g.dealer + 4) % 4]} seat">${WIND_SYMBOLS[(i - g.dealer + 4) % 4]}<small>${WINDS[(i - g.dealer + 4) % 4]}</small></span>${active ? `<span class="seat-turn">TURN</span><span class="seat-timer" data-countdown="${g.turnDeadline}"></span>` : ''}${!p.bot ? `<i class="seat-online ${p.connected ? '' : 'away'}"></i>` : ''}</div>`;
     })
     .join('');
   knownPlayers = new Set(g.players.map((p) => p.profile.id));
@@ -657,7 +670,6 @@ function renderGame(g: GameView) {
   document.querySelector('#table-sidebar')!.innerHTML = tableInfoHTML(g.rules);
   document.querySelector('#log-entries')!.innerHTML = [...g.events]
     .reverse()
-    .slice(0, 35)
     .map(
       (e) =>
         `<div class="log-entry ${e.type}"><span class="log-symbol">${e.type === 'win' ? '✦' : e.type === 'claim' ? '↗' : e.type === 'bonus' ? '❀' : '·'}</span><div><p>${esc(e.text)}</p><time>${new Date(e.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time></div>${e.tile !== undefined ? tileStatic(e.tile, 'tiny') : ''}</div>`,
@@ -848,7 +860,7 @@ function showProfile() {
   openDialog(
     'profile',
     'A familiar face.',
-    `<form id="profile-form"><div class="profile-preview">${avatarHTML(p.name, p.avatar)}<div><strong>Your place in the club</strong><small>${p.hands} hands played · ${p.wins} wins</small></div></div><label>DISPLAY NAME<input name="name" maxlength="24" value="${esc(p.name)}" required/></label><label>YOUR COLOR</label><div class="avatar-picker">${['jade', 'clay', 'gold', 'blue'].map((c) => `<label><input type="radio" name="avatar" value="${c}" ${p.avatar === c ? 'checked' : ''}/><span class="avatar ${c}">${esc(p.name.slice(0, 1))}</span><small>${c}</small></label>`).join('')}</div><p class="form-note">Your profile and saved rules stay in this browser. Reconnect to keep your seat.</p><button class="button primary full">Save profile ${icon('check')}</button></form>`,
+    `<form id="profile-form"><div class="profile-preview">${avatarHTML(p.name, p.avatar)}<div><strong>Your place in the club</strong><small>${p.hands} hands played · ${p.wins} wins</small></div></div><label>DISPLAY NAME<input name="name" maxlength="24" value="${esc(p.name)}" required/></label><label>CHOOSE YOUR AVATAR</label><div class="avatar-picker dicebear-picker">${AVATAR_CHOICES.map((c) => `<label><input type="radio" name="avatar" value="${c}" ${avatarChoice(p.avatar) === c ? 'checked' : ''}/>${avatarHTML(p.name, c)}<small>${c.split(':')[0]} ${Number(c.split(':')[1]) + 1}</small></label>`).join('')}</div>${avatarAttribution}<p class="form-note">Your profile, history and saved tables live on the server. This browser saves the credential that reconnects you to them.</p><div class="profile-shortcuts"><button type="button" class="button outline" data-social="history">Hand history</button><button type="button" class="button outline" data-social="saved">Saved tables</button></div><button class="button primary full">Save profile ${icon('check')}</button></form>`,
   );
 }
 function showLobbies() {
@@ -870,9 +882,6 @@ function helpBody(r?: Rules) {
   const preset = r?.preset ?? 'singapore';
   return `<div class="help-body"><div class="help-lead">${mark}<p>Four players, a wall of tiles,<br>and a little possibility in every draw.</p></div><ol class="help-steps"><li><strong>Build a winning hand.</strong><p>Usually four sets and a pair: three identical tiles (pung), three consecutive suited tiles (chow), or four identical tiles (kong). Special hands depend on the tradition.</p></li><li><strong>Draw, consider, discard.</strong><p>Your draw arrives automatically. Drag tiles to arrange them, or use Alt + Left/Right on a focused tile. Sort tiles restores suit order. Select a tile, then press Discard. If your turn expires, the server discards your drawn tile. Tap any tile to see its name.</p></li><li><strong>See a tile you need? Make a call.</strong><p>Every legal win, pung, kong, and chow appears in the action dock inside the game window. Hover, focus, or tap the center seal to inspect discarded tiles and counts. Chows come only from the player before you. Choose a sequence when several chows are legal.</p></li><li><strong>Let the table resolve the call.</strong><p>Wins have first priority. ${r?.meldPriority === 'equal' ? 'All meld calls share priority.' : r?.meldPriority === 'chow-first' ? 'Chows precede pungs and kongs.' : 'Pungs and kongs precede chows.'} The earliest valid click received by the server wins a tie. A lower-priority claim waits for possible higher claims. ${r?.claimSeconds ?? 8} seconds to respond; silence passes.</p></li></ol><div class="help-variant"><span class="eyebrow">${esc(r?.name ?? PRESETS[preset].name)}</span><h3>${PRESET_DETAILS[preset].subtitle}</h3><p>${preset === 'riichi' ? 'A yaku is required; dora alone cannot win. Declare riichi on a closed, ready hand, then discard only your draws. Furiten blocks ron when your waits include your own discards or when you have passed a winning tile. The fourteen-tile dead wall supplies kan draws and dora.' : preset === 'mcr' ? 'Reach eight fan before counting flowers. The scoring engine considers MCR patterns, including seven pairs, knitted hands, and thirteen orphans. Flowers are exposed and replaced automatically. The dealer advances after every hand.' : 'Flowers, seasons, and animals reveal and replace automatically. Own flowers and every animal add tai. Cat–rat and rooster–centipede pairs earn instant points. The default needs one tai, capped at five. Complete dragon/wind sets and flower collections can win special hands.'}</p><small>${PRESET_DETAILS[preset].source}</small></div>${r ? `<div class="help-variant"><span class="eyebrow">THIS TABLE</span><p>${r.rounds} winds · ${r.turnSeconds}s turns · ${r.claimSeconds}s claims · ${r.minimum} minimum ${r.preset === 'riichi' ? 'han' : r.preset === 'singapore' ? 'tai' : 'fan'} · ${r.scoreMultiplier}× point settlement.</p><p>Chows ${r.allowChow ? 'on' : 'off'} · Kongs ${r.allowKong ? 'on' : 'off'} · Seven pairs ${r.sevenPairs ? 'on' : 'off'}.</p><p>${r.chips ? `Each point changes your fake chips by ${r.chipsPerPoint}. You start with ${r.startingChips.toLocaleString()} fake chips.` : 'Fake chips are off.'} ${r.points ? 'Points are tracked.' : 'Point totals are off; qualifying scores still apply.'}</p>${r.houseBonuses.map((b) => `<p><strong>${esc(b.name)}</strong>: +${b.points} ${r.preset === 'riichi' ? 'points' : r.preset === 'mcr' ? 'fan' : 'tai'} for ${b.condition}.</p>`).join('')}</div>` : ''}<p class="help-source">Compare the <a href="https://mahjong-europe.org/portal/images/docs/mcr_EN.pdf" target="_blank" rel="noopener">MCR rulebook</a>, <a href="https://mahjong-europe.org/portal/images/docs/Riichi-rules-2025-EN.pdf" target="_blank" rel="noopener">EMA 2025 rules</a>, and <a href="https://singaporemahjong.com/rules/" target="_blank" rel="noopener">Singapore source</a>. Four Winds uses the online adaptations and Singapore profile documented in the project.</p><div class="form-note">${icon('leaf')} Points and chips are for play. No real money, payments, or cash-out.</div></div>`;
 }
-function learnHTML() {
-  return `<section class="learn-page"><div class="page-title"><span class="eyebrow">A TRADITION WORTH SHARING</span><h1>A few tiles.<br>A world of possibilities.</h1><p>You don’t need to know everything to take a seat.</p></div><div class="learn-grid">${(['mcr', 'riichi', 'singapore'] as Preset[]).map((p) => `<article class="learn-card"><h2>${PRESETS[p].name}</h2>${helpBody(PRESETS[p])}<button class="button primary" data-preset="${p}">Play this tradition ${icon('arrow')}</button></article>`).join('')}</div></section>`;
-}
 function nextHandHTML(g: GameView) {
   if (g.phase !== 'ended') return '';
   const ready = g.players.filter((p) => p.ready).length;
@@ -884,7 +893,10 @@ function showResult(g: GameView) {
   openDialog(
     'result',
     r.winner === null ? 'A hand drawn.' : `${esc(g.players[r.winner].profile.name)} wins!`,
-    `<div class="result-banner ${r.winner !== null ? 'victory' : ''}">${icon(r.winner !== null ? 'trophy' : 'leaf')}<span>${esc(r.reason)}</span>${r.score ? `<strong>${r.score.value}<small>${r.score.unit}${r.score.fu ? ` · ${r.score.fu} fu` : ''}</small></strong>` : ''}</div>${r.winner !== null ? `${winningHandHTML(g)}<div class="score-patterns">${r.score!.patterns.map((p) => `<div><span>${esc(p.name)}</span><strong>+${p.value}</strong></div>`).join('')}</div>` : `<p class="dialog-intro">${g.rules.preset === 'riichi' ? `${r.tenpai?.map((i) => esc(g.players[i].profile.name)).join(', ') || 'No players'} in tenpai.` : 'The next hand is another chance.'}</p>`}<div class="result-scores">${g.players.map((p, i) => `<div>${avatarHTML(p.profile.name, p.profile.avatar, p.bot)}<span>${esc(p.profile.name)}</span><strong class="${r.deltas[i] >= 0 ? 'positive' : 'negative'}">${r.deltas[i] > 0 ? '+' : ''}${r.deltas[i].toLocaleString()}</strong>${g.rules.points ? `<small>${p.points.toLocaleString()} total</small>` : ''}</div>`).join('')}</div><p class="form-note">${g.phase === 'finished' ? 'Match complete. Totals include placement points where applicable.' : r.repeat ? 'The dealer keeps the seat for another hand.' : 'The winds turn. The next player becomes East.'}</p>${g.phase === 'finished' ? `<button class="button primary full" data-do="close">Back to the table ${icon('arrow')}</button>` : `<div id="next-hand-panel">${nextHandHTML(g)}</div>`}`,
+    `<div class="result-banner ${r.winner !== null ? 'victory' : ''}">${icon(r.winner !== null ? 'trophy' : 'leaf')}<span>${esc(r.reason)}</span>${r.score ? `<strong>${r.score.value}<small>${r.score.unit}${r.score.fu ? ` · ${r.score.fu} fu` : ''}</small></strong>` : ''}</div>${r.winner !== null ? `${winningHandHTML(g)}<div class="score-patterns">${r.score!.patterns.map((p) => `<div><span>${esc(p.name)}</span><strong>+${p.value}</strong></div>`).join('')}</div>` : `<p class="dialog-intro">${g.rules.preset === 'riichi' ? `${r.tenpai?.map((i) => esc(g.players[i].profile.name)).join(', ') || 'No players'} in tenpai.` : 'The next hand is another chance.'}</p>`}<div class="result-scores">${g.players.map((p, i) => `<div>${avatarHTML(p.profile.name, p.profile.avatar, p.bot)}<span>${esc(p.profile.name)}</span><strong class="${r.deltas[i] >= 0 ? 'positive' : 'negative'}">${r.deltas[i] > 0 ? '+' : ''}${r.deltas[i].toLocaleString()}</strong>${g.rules.points ? `<small>${p.points.toLocaleString()} total</small>` : ''}</div>`).join('')}</div><details class="postgame-log"><summary>Full hand log · ${g.events.length} events</summary>${eventLogHTML(
+      g.events,
+      g.players.map((p) => p.profile.name),
+    )}</details><button class="text-button" data-social="history">Your hand history →</button><p class="form-note">${g.phase === 'finished' ? 'Match complete. Totals include placement points where applicable.' : r.repeat ? 'The dealer keeps the seat for another hand.' : 'The winds turn. The next player becomes East.'}</p>${g.phase === 'finished' ? `<button class="button primary full" data-do="close">Back to the table ${icon('arrow')}</button>` : `<div id="next-hand-panel">${nextHandHTML(g)}</div>`}`,
     true,
   );
 }
@@ -1065,6 +1077,7 @@ app.addEventListener('click', async (e) => {
     }
     if (button.dataset.join) {
       await command('join', button.dataset.join);
+      closeDialog();
       return;
     }
     if (button.dataset.lobby) {
@@ -1073,7 +1086,9 @@ app.addEventListener('click', async (e) => {
       return;
     }
     if (button.dataset.tile) {
-      if (rack?.suppressClick() || button.dataset.canDiscard !== 'true') return;
+      if (rack?.suppressClick()) return;
+      if (social.selectTile(Number(button.dataset.tile))) return;
+      if (button.dataset.canDiscard !== 'true') return;
       selected = Number(button.dataset.tile);
       renderGame(state!.room!.game!);
       return;
@@ -1239,11 +1254,12 @@ app.addEventListener('click', async (e) => {
         openDialog(
           'leave',
           'Leave this table?',
-          `<p class="dialog-intro">${state!.room!.game ? 'A bot will take your seat and finish the match for the table.' : 'Your seat will become available for someone else.'}</p><button class="button primary full" data-do="confirm-leave">Leave the table ${icon('arrow')}</button>`,
+          `<p class="dialog-intro">${state!.room!.players.filter((p) => !p.bot).length === 1 ? 'You are the last player. Save this table to return to the same hand later?' : 'Save a bookmark to return later. A bot takes your seat while the table continues.'}</p><button class="button primary full" data-do="save-leave">Save and leave ${icon('check')}</button><button class="button outline full" data-do="confirm-leave">Leave without saving ${icon('arrow')}</button>`,
         );
         break;
+      case 'save-leave':
       case 'confirm-leave':
-        await command('leave');
+        await command('leave', { save: button.dataset.do === 'save-leave' });
         closeDialog();
         mounted = '';
         render();

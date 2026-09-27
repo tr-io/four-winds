@@ -282,11 +282,11 @@ test('3D face inspection names visible tiles and never reveals a concealed tile'
   camera.lookAt(0, 0, 0.7);
   camera.updateMatrixWorld();
   const point = (x: number, z: number) => {
-    const v = new Vector3(x, 0.254, z).project(camera);
+    const v = new Vector3(x, 0.178, z).project(camera);
     return { x: rect.x + ((v.x + 1) / 2) * rect.width, y: rect.y + ((1 - v.y) / 2) * rect.height };
   };
   // A face-up bonus away from the center's discard-ledger hit target.
-  const visible = point(4.7, 3.7);
+  const visible = point(-0.48, 4.8);
   expect(await page.evaluate((p) => document.elementFromPoint(p.x, p.y)?.tagName, visible)).toBe(
     'CANVAS',
   );
@@ -294,9 +294,9 @@ test('3D face inspection names visible tiles and never reveals a concealed tile'
   await expect(page.getByRole('tooltip')).toHaveText('Chrysanthemum');
   await page.mouse.click(visible.x, visible.y);
   await expect(page.getByRole('tooltip')).toHaveText('Chrysanthemum');
-  // Opposite hand, off-center to avoid its seat badge. The server has private tiles here.
-  expect(game.players[2].hand.length).toBe(13);
-  const hidden = point(2.82, -4.9);
+  // Right-hand seat, away from the HTML seat badges. The server has private tiles here.
+  expect(game.players[1].hand.length).toBe(13);
+  const hidden = point(5.46, 1.92);
   expect(await page.evaluate((p) => document.elementFromPoint(p.x, p.y)?.tagName, hidden)).toBe(
     'CANVAS',
   );

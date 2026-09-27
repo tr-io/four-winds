@@ -193,3 +193,18 @@ npx playwright test --headed
 - **A valid-looking hand cannot win:** MCR requires qualifying fan before flowers; Riichi requires a yaku before dora; Singapore requires its configured minimum. The table's book button shows its active rules.
 - **Ruleset disappeared after clearing browser data:** the saved bearer credential identifies the profile. Guest identity has no password recovery. Keep the same browser storage to retain access.
 - **Dependency patch fails:** run `npm ci` against the checked-in lockfile. The patches intentionally target the pinned scorer versions; update them together with the scoring tests.
+
+## Interactive lessons and social tables
+
+See [Social tables and interactive lessons](docs/social-and-learning.md) for the walkthrough,
+setup conventions, avatar licenses and storage details. New focused checks:
+
+```sh
+npx vitest run tests/lessons.test.ts tests/setup.test.ts tests/wall-layout.test.ts tests/multiplayer.test.ts
+npm run test:e2e -- tests/browser/learning.spec.ts tests/browser/social.spec.ts
+```
+
+Use the normal browser's notification permission prompt to opt into turn alerts. Keep the tab
+open in the background and play from another identity to test an incoming turn or claim.
+Check audible garden, rain and pond ambience after a pointer/keyboard gesture; switching to a
+hidden tab should mute ambience. These depend on browser permissions and audio output.

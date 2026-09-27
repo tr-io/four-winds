@@ -5,25 +5,29 @@ before relying on the snapshot. Start with the user's latest request.
 
 ## Resume here
 
-1. Read `git status` and recent commits. The UI refresh is on **`feat/local-table-themes`**, pushed as
-   [PR #1](https://github.com/tr-io/four-winds/pull/1). GitHub CI was running at handoff.
-   Follow the branch/PR workflow in AGENTS.md; the user replaced the old direct-to-main workflow.
-2. The club now uses a forest/jade palette with original vector lantern and wind-garden artwork.
-   In-game **Table settings → Jade Night / Porcelain Day** changes local environment, felt,
-   table frame, lighting, and UI colors. `client/table-theme.ts` stores the choice under a player-ID
-   localStorage key; no theme enters server state or commands. The club always stays dark.
-3. The duplicate concealed hand came from Three.js plus the HTML rack. `client/table.ts` now
-   omits the local concealed row in live games. `HandRack` remains the sole playable hand;
-   opponents' backs, public melds, bonuses, and discards stay in Three.js. The explicit hand
-   inspector and results still show details. English seat labels and mobile claim layout improved.
-4. Gameplay, rulesets, scores, and multiplayer remain server-owned. Existing selection, draw,
-   discard, claim, win, audio, and reduced-motion effects are preserved. Read the local-theme
-   section in [TESTING.md](TESTING.md) for normal-turn and deterministic claim checks.
-5. Verification: 75 unit/network/UI tests, 22 desktop browser tests, 10 Android/iPhone cases,
-   five deployment tests, build/type, formatting, and release Compose validation pass. The two
-   new mobile theme cases were rerun after fixing landscape claim/rack overflow; all eight
-   existing mobile cases passed in the preceding run. Review captures are in `.cache/ui-review/`
-   (local, ignored). Production has not been changed.
+1. Current work is on **`feat/social-table-experience`**, based on merged UI PR #1 (`65fb71e`).
+   The user requested social/table features and an interactive How to Play page. PR creation
+   is the final publishing step; check Git and CI before relying on this snapshot.
+2. **How to play** is now an interactive page with preset switching, tile explanations, a moving
+   turn walkthrough, hand grouping/checking, and competing-claim examples. `server/lessons.ts`
+   validates separate preset examples through the existing engine in isolated games; scoring,
+   minimums, dealer progression, and configured claim arbitration remain unchanged.
+3. Table additions: scoped lobby/table chat, emoji reactions, queued discards, player meld
+   inspection, DiceBear avatars, complete hand logs and profile history, saved-table bookmarks,
+   last-player seat reservation/pause, local board rotation, turn notifications, and interactive
+   garden/rain/pond ambience. See [feature guide](docs/social-and-learning.md) for behavior,
+   storage, supported notifications, attribution, and setup conventions.
+4. The server now records public dice/break/slot metadata. MCR has two throws, Riichi one;
+   Singapore uses the documented one-throw digital convention. Deals use packets and replacement
+   draws; the renderer walks adjacent wall stacks instead of removing tiles from all sides.
+   Tile dimensions/rows and wall corners are separated. Opponent concealed faces are never built
+   in Three.js, including when rotating. Existing saved games use a count-based wall fallback
+   until their next deal. Stable seats and initial host-as-East are preserved.
+5. Verification so far: **92 unit/network tests**, **28 desktop browser tests** (27-suite pass plus the new notification check),
+   **12 mobile tests** (Android Chrome/iPhone WebKit), build/type, formatting, five deployment
+   tests, and release Compose validation pass. Local screenshots are in `.cache/ui-review/` (ignored).
+   All browser fixtures use isolated stores; production has not been changed. The local review
+   server at **localhost:3102** uses `/tmp/four-winds-feature-review.json`, separate from user data.
 
 ## User preferences and decisions
 

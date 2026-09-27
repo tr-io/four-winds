@@ -316,3 +316,79 @@ describe('network origin policy', () => {
     socket.disconnect();
   });
 });
+
+describe('social play and saved profiles', () => {
+  it('scopes chat to the current table or lobby and bounds reactions and messages', async () => {
+    const a = await client(),
+      b = await client(),
+      outsider = await client();
+    await a.command('create', { name: 'Chat', rules: PRESETS.mcr, bots: false });
+    await b.command('join', a.state.room!.code);
+    expect((await a.command('chat', { scope: 'table', text: '<b>Hello</b>' })).ok).toBe(true);
+    await flush();
+    expect(b.state.room!.chat?.[0].text).toBe('<b>Hello</b>');
+    expect(outsider.state.room).toBeNull();
+    expect(outsider.state.chat).toEqual([]);
+    expect((await a.command('chat', { scope: 'table', text: 'spam' })).ok).toBe(false);
+    expect(
+      (await b.command('chat', { scope: 'table', text: 'arbitrary', reaction: true })).ok,
+    ).toBe(false);
+    expect((await b.command('chat', { scope: 'table', text: '👏', reaction: true })).ok).toBe(true);
+    expect((await outsider.command('chat', { scope: 'table', text: 'peek' })).ok).toBe(false);
+    expect((await outsider.command('chat', { scope: 'lobby', text: 'Welcome' })).ok).toBe(true);
+    await flush();
+    expect(a.state.chat?.at(-1)?.text).toBe('Welcome');
+  });
+  it('saves a last-player table, reserves their exact seat, and resumes after a restart', async () => {
+    const a = await client();
+    await a.command('create', { name: 'Later', rules: PRESETS.mcr, bots: true });
+    const code = a.state.room!.code,
+      token = a.token,
+      hand = [...a.state.room!.game!.players[0].hand];
+    expect((await a.command('leave', { save: true })).ok).toBe(true);
+    expect(a.state.room).toBeNull();
+    expect(a.state.savedTables?.[0].code).toBe(code);
+    expect(service.rooms.get(code)?.reservedSeats).toHaveProperty(a.state.profile.id, 0);
+    a.socket.disconnect();
+    service.close();
+    await new Promise<void>((r) => io.close(() => r()));
+    await serve(join(folder, 'state.json'));
+    const again = await client(token);
+    expect((await again.command('join', code)).ok).toBe(true);
+    expect(again.state.room!.game!.seat).toBe(0);
+    expect(again.state.room!.game!.players[0].hand).toEqual(hand);
+    expect(again.state.room!.host).toBe(again.state.profile.id);
+  });
+  it('stores the full completed hand under its participant and rejects another profile’s history ID', async () => {
+    const a = await client(),
+      stranger = await client();
+    await a.command('create', {
+      name: 'Archive',
+      rules: { ...PRESETS.singapore, turnSeconds: 120 },
+      bots: true,
+    });
+    const g = service.rooms.get(a.state.room!.code)!.game!;
+    const { event } = await import('../server/engine');
+    for (let i = 0; i < 140; i++) event(g, `Earlier event ${i}`);
+    g.wall = g.wall.slice(0, g.reserve);
+    const result = await a.command('action', { decision: g.decision, action: 'end-hand' });
+    expect(result.ok).toBe(true);
+    expect(a.state.history).toHaveLength(1);
+    const id = a.state.history![0].id;
+    const detail = await a.command('history-detail', id);
+    expect((detail.record as { events: unknown[] }).events.length).toBeGreaterThan(140);
+    expect((await stranger.command('history-detail', id)).ok).toBe(false);
+  });
+  it('accepts only supplied DiceBear choices and keeps lesson commands separate from live games', async () => {
+    const a = await client();
+    expect((await a.command('profile', { name: 'River', avatar: 'bottts:5' })).ok).toBe(true);
+    expect(
+      (await a.command('profile', { name: 'River', avatar: 'https://evil/avatar.svg' })).ok,
+    ).toBe(false);
+    await a.command('create', { name: 'Lesson isolation', rules: PRESETS.mcr, bots: true });
+    const g = service.rooms.get(a.state.room!.code)!.game!,
+      before = JSON.stringify(g);
+    expect((await a.command('lesson-claims', 'riichi')).ok).toBe(true);
+    expect(JSON.stringify(g)).toBe(before);
+  });
+});

@@ -1,10 +1,13 @@
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { TILE_SIZE, seatPoint, wallPosition, wallLayout } from './table-layout';
+import type { WallSetup } from '../shared/types';
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import type { GameView } from '../shared/types';
 import { drawTileFace } from './tile-art';
 import { kind, tileName } from '../shared/tiles';
 import { hideTileTooltip, showTileTooltip } from './tile-tooltip';
-import { DEAL, dealTileDelay } from './deal-sequence';
+import { DEAL } from './deal-sequence';
 import { TABLE_THEMES, type TableTheme } from './table-theme';
 type Piece = {
   group: THREE.Group;
@@ -15,6 +18,7 @@ type Piece = {
   from: THREE.Vector3;
   lift: number;
   deal?: { index: number; duration: number };
+  removeAt?: number;
 };
 export class MahjongTable {
   private renderer: THREE.WebGLRenderer;
@@ -26,8 +30,14 @@ export class MahjongTable {
   private camera: THREE.PerspectiveCamera;
   private pieces = new Map<string, Piece>();
   private textures = new Map<number, THREE.MeshStandardMaterial>();
-  private tileGeometry = new RoundedBoxGeometry(0.43, 0.22, 0.6, 2, 0.045);
-  private faceGeometry = new THREE.PlaneGeometry(0.384, 0.532);
+  private tileGeometry = new RoundedBoxGeometry(
+    TILE_SIZE.width,
+    TILE_SIZE.height,
+    TILE_SIZE.depth,
+    2,
+    0.025,
+  );
+  private faceGeometry = new THREE.PlaneGeometry(0.26, 0.38);
   private ivory = new THREE.MeshStandardMaterial({ color: 0xeee8d6, roughness: 0.36 });
   private back = new THREE.MeshStandardMaterial({ color: 0x397e67, roughness: 0.35 });
   private side = new THREE.MeshStandardMaterial({ color: 0xf3eedf, roughness: 0.5 });
@@ -37,6 +47,8 @@ export class MahjongTable {
   private get reduced() {
     return this.motionPreference.matches;
   }
+  private controls: OrbitControls;
+  private openingUntil = 0;
   private preview: boolean;
   private disposed = false;
   private impactAt = -10000;
@@ -70,6 +82,17 @@ export class MahjongTable {
     this.camera = new THREE.PerspectiveCamera(39, 1, 0.1, 100);
     this.camera.position.set(preview ? 8.5 : 0, 15, preview ? 12 : 12);
     this.camera.lookAt(0, 0, preview ? 0 : 0.7);
+    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+    this.controls.target.set(0, 0, preview ? 0 : 0.7);
+    this.controls.enabled = false;
+    this.controls.enablePan = true;
+    this.controls.enableZoom = false;
+    this.controls.minPolarAngle = Math.PI / 7;
+    this.controls.maxPolarAngle = Math.PI / 2.7;
+    this.controls.addEventListener('change', () => {
+      this.controls.target.clamp(new THREE.Vector3(-1, 0, -1), new THREE.Vector3(1, 0, 1));
+      this.wake();
+    });
     this.scene.add(this.ambient);
     const key = new THREE.DirectionalLight(0xffedcd, 2.4);
     key.position.set(-5, 12, 6);
@@ -91,6 +114,19 @@ export class MahjongTable {
     this.resize();
     this.demo();
     this.motionPreference.addEventListener('change', this.wake);
+    this.wake();
+  }
+  setRotation(enabled: boolean) {
+    if (this.preview) return;
+    this.controls.enabled = enabled && !this.preview;
+    this.renderer.domElement.style.touchAction = enabled ? 'none' : 'auto';
+    if (!enabled) this.resetView();
+    this.wake();
+  }
+  resetView() {
+    this.camera.position.set(0, 15, 12);
+    this.controls.target.set(0, 0, 0.7);
+    this.controls.update();
     this.wake();
   }
   setTheme(theme: TableTheme) {
@@ -179,7 +215,7 @@ export class MahjongTable {
     }
     return this.textures.get(k)!;
   }
-  private put(id: string, tile: number | null, x: number, z: number, rotation = 0, y = 0.14) {
+  private put(id: string, tile: number | null, x: number, z: number, rotation = 0, y = 0.095) {
     let p = this.pieces.get(id);
     if (!p) {
       const group = new THREE.Group();
@@ -199,7 +235,7 @@ export class MahjongTable {
         tile === null ? this.back : this.material(tile),
       );
       face.rotation.x = -Math.PI / 2;
-      face.position.y = 0.114;
+      face.position.y = 0.083;
       group.add(face);
       group.position.set(x, y + 1.2, z);
       this.scene.add(group);
@@ -214,6 +250,7 @@ export class MahjongTable {
       };
       this.pieces.set(id, p);
     }
+    p.group.scale.setScalar(1);
     p.face.material = tile === null ? this.back : this.material(tile);
     p.face.userData.tile = tile;
     if (p.target.distanceToSquared(new THREE.Vector3(x, y, z)) > 0.001) {
@@ -235,38 +272,44 @@ export class MahjongTable {
     }[],
     me: number,
     wallCount: number,
+    setup?: WallSetup,
   ) {
     const used = new Set<string>();
-    const put = (id: string, tile: number | null, x: number, z: number, r = 0, y = 0.14) => {
+    const put = (id: string, tile: number | null, x: number, z: number, r = 0, y = 0.095) => {
       used.add(id);
       this.put(id, tile, x, z, r, y);
     };
-    const transform = (x: number, z: number, relative: number) => {
-      const a = (relative * Math.PI) / 2;
-      return { x: x * Math.cos(a) - z * Math.sin(a), z: x * Math.sin(a) + z * Math.cos(a), r: -a };
-    };
+    const transform = seatPoint;
     players.forEach((p, seat) => {
       const relative = (seat - me + 4) % 4;
       // The HTML rack is the local player's sole concealed hand and input surface.
       // Public melds and discards remain here alongside opponents' concealed backs.
       const length = !this.preview && relative === 0 ? 0 : p.tileCount;
       for (let i = 0; i < length; i++) {
-        const t = p.hand[i] ?? null,
-          pt = transform((i - (length - 1) / 2) * 0.47, 4.9, relative);
+        const t = relative === 0 ? (p.hand[i] ?? null) : null,
+          pt = transform((i - (length - 1) / 2) * 0.32, 5.46, relative);
         put(t !== null ? `t${t}` : `hidden${seat}:${i}`, t, pt.x, pt.z, pt.r);
       }
       let di = 0;
       for (const d of p.discards) {
         if (d.claimed) continue;
-        const pt = transform(((di % 6) - 2.5) * 0.45, 1.4 + Math.floor(di / 6) * 0.64, relative);
+        const rows = Math.max(1, Math.ceil(p.discards.filter((d) => !d.claimed).length / 6));
+        const scale = Math.min(1, 2.65 / (rows * 0.46));
+        const pt = transform(
+          -2.8 + (di % 6) * 0.34,
+          0.38 + Math.floor(di / 6) * 0.46 * scale,
+          relative,
+        );
         put(`t${d.tile}`, d.tile, pt.x, pt.z, pt.r);
+        this.pieces.get(`t${d.tile}`)!.group.scale.setScalar(scale);
         di++;
       }
       let mi = 0;
+      const meldWidth = p.melds.reduce((n, m) => n + m.tiles.length * 0.32 + 0.12, 0) - 0.12;
       for (const m of p.melds) {
         for (let i = 0; i < m.tiles.length; i++) {
           const t = m.tiles[i],
-            pt = transform(-4.7 + (mi + i) * 0.44, 4.18, relative);
+            pt = transform(-meldWidth / 2 + 0.16 + (mi + i) * 0.32, 4.15, relative);
           put(
             `t${t}`,
             m.concealed && (i === 0 || i === m.tiles.length - 1) ? null : t,
@@ -275,25 +318,29 @@ export class MahjongTable {
             pt.r,
           );
         }
-        mi += m.tiles.length + 0.25;
+        mi += m.tiles.length + 0.375;
       }
       for (let i = 0; i < p.bonuses.length; i++) {
         const t = p.bonuses[i],
-          pt = transform(4.7 - (i % 4) * 0.45, 3.7 - Math.floor(i / 4) * 0.6, relative);
+          pt = transform((i - (p.bonuses.length - 1) / 2) * 0.32, 4.8, relative);
         put(`t${t}`, t, pt.x, pt.z, pt.r);
       }
     });
-    // Wall tiles are neutral placeholders. No wall ID/order reaches the client.
-    for (let i = 0; i < wallCount; i++) {
-      const edge = i % 4,
-        n = Math.floor(i / 4),
-        col = Math.floor(n / 2),
-        layer = n % 2;
-      const pt = transform((col - 8) * 0.45, 3.4, edge);
-      put(`wall${i}`, null, pt.x, pt.z, pt.r, 0.14 + layer * 0.235);
-    }
+    // Only neutral slot numbers reach the renderer, never wall tile identities.
+    const wall = setup ?? {
+      total: 144,
+      dice: [],
+      breakSeat: 0,
+      breakStack: 0,
+      breakIndex: 0,
+      front: 144 - wallCount,
+      back: 0,
+      dead: 0,
+      deal: [],
+    };
+    for (const pt of wallLayout(wall, me)) put(`wall${pt.slot}`, null, pt.x, pt.z, pt.r, pt.y);
     for (const [id, p] of this.pieces)
-      if (!used.has(id)) {
+      if (!used.has(id) && !p.removeAt) {
         this.scene.remove(p.group);
         this.pieces.delete(id);
       }
@@ -318,31 +365,49 @@ export class MahjongTable {
     this.layout(players, 0, 76);
   }
   update(game: GameView) {
-    this.layout(
-      game.players,
-      game.seat,
-      game.wallCount + (game.rules.preset === 'riichi' ? 14 : game.reserve),
-    );
+    const remaining = game.wallCount + (game.rules.preset === 'riichi' ? 14 : game.reserve);
+    const total =
+      136 +
+      (game.rules.preset === 'mcr' || (game.rules.preset === 'singapore' && game.rules.sgFlowers)
+        ? 8
+        : 0) +
+      (game.rules.preset === 'singapore' && game.rules.sgAnimals ? 4 : 0);
+    const setup = game.setup ?? {
+      total,
+      dice: [],
+      breakSeat: 0,
+      breakStack: 0,
+      breakIndex: 0,
+      front: total - remaining,
+      back: 0,
+      dead: 0,
+      deal: [],
+    };
+    this.layout(game.players, game.seat, remaining, setup);
     this.wake();
   }
   deal(game: GameView) {
-    if (this.reduced) return;
-    const now = performance.now();
-    const delays = new Map<string, number>();
-    game.players.forEach((p, seat) => {
-      for (let i = 0; i < p.tileCount; i++)
-        delays.set(
-          p.hand[i] !== undefined ? `t${p.hand[i]}` : `hidden${seat}:${i}`,
-          dealTileDelay(seat, i, game.dealer),
-        );
+    if (this.reduced || !game.setup) return;
+    const now = performance.now(),
+      setup = game.setup;
+    this.openingUntil = now + DEAL.duration;
+    // Rebuild consumed initial slots; each packet leaves the actual broken wall in order.
+    setup.deal.forEach((step, index) => {
+      const pt = wallPosition(step.slot, setup.total, game.seat);
+      const id = `deal${step.slot}`;
+      this.put(id, null, pt.x, pt.z, pt.r, pt.y);
+      const p = this.pieces.get(id)!;
+      p.group.position.set(pt.x, pt.y, pt.z);
+      p.group.rotation.y = pt.r;
+      p.from.copy(p.group.position);
+      const target = seatPoint(((index % 14) - 6.5) * 0.32, 5.46, (step.seat - game.seat + 4) % 4);
+      p.target.set(target.x, 0.095, target.z);
+      p.rotation = target.r;
+      p.born = now + DEAL.shuffle + DEAL.assemble + Math.floor(index / 4) * DEAL.packet;
+      p.deal = { index: -1, duration: DEAL.flight };
+      p.lift = 1;
+      p.removeAt = p.born + DEAL.flight;
     });
-    let index = 0;
-    for (const [id, p] of this.pieces) {
-      const hand = delays.get(id);
-      p.deal = { index: index++, duration: hand === undefined ? DEAL.assemble : DEAL.flight };
-      p.born = now + (hand ?? DEAL.shuffle + (index % 8) * 15);
-      p.lift = hand === undefined ? 0.6 : 1.6;
-    }
     this.container.dataset.deal = 'active';
     this.wake();
   }
@@ -385,13 +450,23 @@ export class MahjongTable {
     if (this.disposed) return;
     const now = performance.now();
     let moving = false;
-    for (const p of this.pieces.values()) {
+    for (const [id, p] of this.pieces) {
+      if (p.removeAt && (now >= p.removeAt || this.reduced)) {
+        this.scene.remove(p.group);
+        this.pieces.delete(id);
+        continue;
+      }
+      if (id.startsWith('hidden')) p.group.visible = now >= this.openingUntil || this.reduced;
       if (this.reduced) {
         p.group.position.copy(p.target);
         p.group.rotation.y = p.rotation;
         p.deal = undefined;
       } else {
         if (p.deal && now < p.born) {
+          if (p.deal.index === -1) {
+            moving = true;
+            continue;
+          }
           const n = p.deal.index,
             angle = n * 2.399 + now * 0.003;
           const radius = 0.5 + (n % 11) * 0.16;
@@ -414,14 +489,7 @@ export class MahjongTable {
       }
     }
     if (![...this.pieces.values()].some((p) => p.deal)) delete this.container.dataset.deal;
-    if (!this.preview) {
-      const age = now - this.impactAt;
-      const amplitude = age < 500 && !this.reduced ? this.impactStrength * (1 - age / 500) : 0;
-      this.camera.position.x = Math.sin(age * 0.048) * amplitude;
-      this.camera.position.y = 15 + Math.sin(age * 0.037) * amplitude;
-      this.camera.lookAt(0, 0, 0.7);
-      if (amplitude > 0) moving = true;
-    }
+    if (now < this.openingUntil && !this.reduced) moving = true;
     this.renderer.render(this.scene, this.camera);
     if (moving) this.wake();
   };
@@ -449,6 +517,7 @@ export class MahjongTable {
     cancelAnimationFrame(this.frame);
     this.motionPreference.removeEventListener('change', this.wake);
     this.observer.disconnect();
+    this.controls.dispose();
     this.container.removeEventListener('pointermove', this.inspectTile);
     this.container.removeEventListener('pointerup', this.inspectTile);
     this.container.removeEventListener('pointerleave', hideTileTooltip);

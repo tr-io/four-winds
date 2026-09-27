@@ -1,7 +1,7 @@
 import type { GameView } from '../shared/types';
 
 // One clock shared by the table, cut-in, and synthesized tile clacks (milliseconds).
-export const DEAL = { shuffle: 600, assemble: 300, packet: 70, flight: 350, duration: 2300 };
+export const DEAL = { shuffle: 1800, assemble: 300, packet: 80, flight: 300, duration: 3700 };
 export const dealTileDelay = (seat: number, index: number, dealer: number) =>
   DEAL.shuffle +
   DEAL.assemble +

@@ -121,10 +121,45 @@ export type GameEvent = {
   text: string;
   seat?: number;
   tile?: Tile;
+  payments?: number[];
+  handNumber?: number;
 };
+export type WallSetup = {
+  total: number;
+  dice: number[][];
+  breakSeat: number;
+  breakStack: number;
+  breakIndex: number;
+  front: number;
+  back: number;
+  dead: number;
+  deal: { seat: number; slot: number }[];
+};
+export type ChatMessage = {
+  id: string;
+  at: number;
+  player: string;
+  name: string;
+  text: string;
+  reaction: boolean;
+};
+export type HandRecord = {
+  id: string;
+  room: string;
+  table: string;
+  preset: Preset;
+  at: number;
+  handNumber: number;
+  players: string[];
+  seat: number;
+  events: GameEvent[];
+  result: HandResult;
+};
+export type SavedTable = { code: string; name: string; lobby: string; available: boolean };
 export type Game = {
   rules: Rules;
   seed: number;
+  setup?: WallSetup;
   phase: 'playing' | 'claim' | 'ended' | 'finished';
   players: Player[];
   dealer: number;
@@ -191,6 +226,10 @@ export type Room = {
   players: Player[];
   game: Game | null;
   createdAt: number;
+  chat?: ChatMessage[];
+  savedBy?: string[];
+  reservedSeats?: Record<string, number>;
+  pausedAt?: number;
 };
 export type RoomSummary = {
   code: string;
@@ -206,6 +245,7 @@ export type RoomSummary = {
   names: string[];
 };
 export type RoomView = {
+  chat?: ChatMessage[];
   code: string;
   name: string;
   host: string;
@@ -214,6 +254,9 @@ export type RoomView = {
   game: GameView | null;
 };
 export type AppState = {
+  chat?: ChatMessage[];
+  savedTables?: SavedTable[];
+  history?: Omit<HandRecord, 'events' | 'result'>[];
   lobby: LobbyView;
   lobbies: LobbyView[];
   profile: Profile;

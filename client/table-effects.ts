@@ -1,3 +1,4 @@
+import type { GameView } from '../shared/types';
 import { DEAL } from './deal-sequence';
 const calls: Record<string, [string, string]> = {
   pung: ['碰', 'PUNG'],
@@ -13,7 +14,8 @@ export class TableEffects {
   private timer: ReturnType<typeof setTimeout> | undefined;
   private seen = '';
   constructor(private host: HTMLElement) {}
-  deal(hand: number) {
+  deal(game: GameView) {
+    const hand = game.handNumber;
     clearTimeout(this.timer);
     const effect = document.createElement('div');
     effect.className = 'deal-effect';
@@ -21,6 +23,20 @@ export class TableEffects {
     effect.setAttribute('role', 'status');
     effect.setAttribute('aria-label', `Hand ${hand}. Shuffling and dealing tiles.`);
     effect.innerHTML = `<div class="deal-halo" aria-hidden="true"></div><div class="deal-winds" aria-hidden="true"><i>東</i><i>南</i><i>西</i><i>北</i></div><div class="deal-caption"><small>HAND ${hand}</small><strong>THE WINDS GATHER</strong><span class="shuffle-label">SHUFFLE</span><span class="deal-label">DEAL · EAST BEGINS</span></div>`;
+    if (game.setup) {
+      const dice = document.createElement('div');
+      dice.className = 'setup-dice';
+      const glyphs = ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+      dice.innerHTML =
+        game.setup.dice
+          .map(
+            (roll, i) =>
+              `<div class="dice-throw throw-${i}" style="--throw:${i}"><small>${i === 0 ? 'EAST ROLLS' : 'SECOND THROW'}</small><div>${roll.map((n) => `<span class="rolling-die" aria-label="Die ${n}">${glyphs[n]}</span>`).join('')}</div><b>${roll.reduce((a, b) => a + b, 0)}</b></div>`,
+          )
+          .join('') +
+        `<p>Break after stack ${game.setup.breakStack} · deal clockwise from the gap</p>`;
+      effect.append(dice);
+    }
     this.host.replaceChildren(effect);
     this.timer = setTimeout(() => this.host.replaceChildren(), DEAL.duration);
   }
