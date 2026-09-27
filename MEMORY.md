@@ -1,6 +1,6 @@
 # Four Winds — agent handoff
 
-Updated **26 September 2026**. This records the last session; verify Git, CI, and running services
+Updated **27 September 2026**. This records the last session; verify Git, CI, and running services
 before relying on the snapshot. Start with the user's latest request.
 
 ## Resume here
@@ -10,9 +10,9 @@ before relying on the snapshot. Start with the user's latest request.
 2. Check GitHub Actions for the latest commit. The full workflow for **`48bd23c` passed**;
    the workflow for **`5da0447` was still running** when this handoff was written.
 3. Feature requests through the saved-table fix are implemented. No feature task is currently
-   unfinished. The user is setting up GitHub deployment secrets for a DigitalOcean Droplet.
-   The current issue is Web Console authentication as `root` after disabling root SSH; use
-   `fwadmin`. Server setup and the first production release remain to be verified.
+   unfinished. The production HTTPS health endpoint is responding, and the user's DigitalOcean
+   firewall attachment/rules and IPv4 TCP reachability were verified. Release workflow status,
+   production multiplayer play, and rollback have not been checked in this verification pass.
 4. Use the guides below for testing or deployment; keep saved games and browser identities intact.
 
 ## User preferences and decisions
@@ -98,7 +98,7 @@ For `5da0447`: all **11 socket tests**, the new lobby browser regression, build/
 format checks passed. The original issue was also rechecked at **localhost:5175**: four old rooms
 were saved separately from one connected live table. Counts are a historical observation.
 
-## Deployment still pending
+## Deployment status
 
 [DEPLOYMENT.md](DEPLOYMENT.md) is the complete DigitalOcean VPS/subdomain guide;
 [deployment research](docs/deployment-research.md) links the provider documentation.
@@ -128,11 +128,18 @@ guide's `PermitRootLogin no`. The guide now explains using `fwadmin` for Web Con
 the separate password-based Recovery Console when SSH is unavailable. The actual remote
 cause and successful Web Console login have not yet been verified.
 
-The user has supplied the deployment domain/IP in chat and prepared the installer command;
-installer success, DNS, registry access, and production deployment remain unverified. They are
-currently configuring GitHub's `production` environment secrets, including `DEPLOY_KNOWN_HOSTS`.
-The server's verified public host key is still needed. Keep credentials out of the repository
-and memory.
+On 27 September 2026, after the user applied the firewall, read-only checks confirmed:
+
+- `doctl compute firewall list-by-droplet 603993824 --output json` returned one attached
+  `four-winds` firewall with status `succeeded`, no pending changes, and the documented inbound
+  TCP 22/80/443, UDP 443, and outbound TCP/UDP/ICMP allowances for IPv4 and IPv6.
+- TCP connections to `167.99.224.146` succeeded on 22/80/443; 3001/5175/2375/2376 timed out.
+- `https://mahjong.leonardliu.com/api/health` returned HTTP 200 over verified HTTPS with
+  `{"ok":true,"game":"Four Winds"}`. The response passed through Caddy.
+
+These checks did not change infrastructure or game state. IPv6, UDP/HTTP3, outbound connections,
+SSH authentication, release workflow status/digest, multiplayer play, and rollback were not
+tested in this pass. Keep credentials out of the repository and memory.
 
 ## Local environment notes
 
