@@ -7,7 +7,8 @@ before relying on the snapshot. Start with the user's latest request.
 
 1. Continue on **`feat/social-table-experience`**, [PR #2](https://github.com/tr-io/four-winds/pull/2).
    The user explicitly requested staying on this feature branch. [PR #3](https://github.com/tr-io/four-winds/pull/3)
-   was merged into it as `f8859c3`; PR #2 remains open and main is unchanged. The top opponent hand was rendered but covered by its player card. Short
+   was merged into it as `f8859c3`; PR #2 remains open and main is unchanged.
+   The top opponent hand was rendered but covered by its player card. Short
    viewports also overlapped seat cards with recent actions and clipped the discard ledger.
    `client/table-viewport.css` now reserves room around the canvas, and `table-camera.ts` fits
    the whole table to that space. Short windows scroll internally. The ledger opens above its
@@ -47,16 +48,15 @@ before relying on the snapshot. Start with the user's latest request.
    tracks and terminates test connections when closing. The regression fails with the old
    cleanup and passes with the fix. This affects test servers only. On Node 24.21.0, all **93 unit**,
    **37 desktop**, and **12 mobile** tests pass, as do build/types, formatting, and five deployment
-   tests. The dependency and fixture fixes are committed on the feature branch; check the latest
-   PR #2 CI run for remote verification.
+   tests. The dependency and fixture fixes are committed as `5234e0d`; its
+   [GitHub CI run](https://github.com/tr-io/four-winds/actions/runs/36324922335) passed.
+   `AGENTS.md` now explicitly directs follow-up work to the active branch and PR in this handoff.
 
 ## User preferences and decisions
 
-- Follow the branch → commit → push → PR workflow in [AGENTS.md](AGENTS.md), requested on
-  27 September 2026. This supersedes the previous direct-to-main preference.
+- Follow [AGENTS.md](AGENTS.md) for the branch and PR workflow. This supersedes the previous
+  direct-to-main preference.
   Repository: `tr-io/four-winds`, remote `git@github.com:tr-io/four-winds.git`.
-- Continue this work on the existing feature branch per the user’s follow-up; do not create
-  another branch/PR for follow-up fixes to PR #2.
 - Work through authorized tasks without repeated confirmation. Explain actual blockers clearly.
 - The table, rack, claim prompts, settings, and help belong inside the game window. Keep actions
   visible on desktop and mobile. The user prefers a mahjong-themed game UI, clear visual state,
