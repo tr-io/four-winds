@@ -44,7 +44,7 @@ Other explicit digital choices:
 
 - Players keep their UI positions while seat winds rotate; physical tournament seat swaps and referee penalties are not modeled.
 - Each hand uses a newly shuffled wall. Production uses cryptographic randomness; deterministic seeds are reserved for tests.
-- Human turns have a configurable deadline. Timeout takes a legal win or discards the drawn tile; after a chow/pung it chooses an allowed discard. Silent claim windows pass. Next-hand readiness has a 60-second fallback.
+- Human turns have a configurable deadline. Timeout takes a legal win or discards the drawn tile; after a chow/pung it chooses an allowed discard. Silent claim windows pass. Next-hand readiness defaults to a 60-second fallback; the timer, all-ready advance, and host advance are configurable before play.
 - Presets keep their researched scoring. House bonuses add fan/tai before their threshold and cap; Riichi house bonuses add flat points per paying opponent after official scoring, without creating a yaku. A global multiplier scales all point transfers, including instant bonuses and riichi deposits.
 - Turning off point tracking stops its cumulative ledger. Hand qualification and settlement still run, and optional fake chips use those settlements. With point tracking off, Riichi's placement standings are tied because no cumulative point score is retained.
 

@@ -67,6 +67,8 @@ npm run test:deploy
 
 ## Project map
 
+For the current agent handoff and next steps, read [MEMORY.md](MEMORY.md).
+
 | Location             | Responsibility                                               |
 | -------------------- | ------------------------------------------------------------ |
 | `client/main.ts`     | Lobby, rooms, profiles, rules editor, hand controls, dialogs |
