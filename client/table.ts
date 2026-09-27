@@ -5,6 +5,7 @@ import { drawTileFace } from './tile-art';
 import { kind, tileName } from '../shared/tiles';
 import { hideTileTooltip, showTileTooltip } from './tile-tooltip';
 import { DEAL, dealTileDelay } from './deal-sequence';
+import { TABLE_THEMES, type TableTheme } from './table-theme';
 type Piece = {
   group: THREE.Group;
   face: THREE.Mesh;
@@ -18,6 +19,10 @@ type Piece = {
 export class MahjongTable {
   private renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
+  private felt = new THREE.MeshStandardMaterial({ roughness: 1 });
+  private wood = new THREE.MeshStandardMaterial({ roughness: 0.55, metalness: 0.08 });
+  private trim = new THREE.MeshStandardMaterial({ roughness: 0.52, metalness: 0.42 });
+  private ambient = new THREE.HemisphereLight();
   private camera: THREE.PerspectiveCamera;
   private pieces = new Map<string, Piece>();
   private textures = new Map<number, THREE.MeshStandardMaterial>();
@@ -40,6 +45,7 @@ export class MahjongTable {
   constructor(
     private container: HTMLElement,
     preview = true,
+    theme: TableTheme = 'jade-night',
   ) {
     this.preview = preview;
     this.renderer = new THREE.WebGLRenderer({
@@ -64,7 +70,7 @@ export class MahjongTable {
     this.camera = new THREE.PerspectiveCamera(39, 1, 0.1, 100);
     this.camera.position.set(preview ? 8.5 : 0, 15, preview ? 12 : 12);
     this.camera.lookAt(0, 0, preview ? 0 : 0.7);
-    this.scene.add(new THREE.HemisphereLight(0xfff9e6, 0x183a2c, 2));
+    this.scene.add(this.ambient);
     const key = new THREE.DirectionalLight(0xffedcd, 2.4);
     key.position.set(-5, 12, 6);
     key.castShadow = true;
@@ -79,6 +85,7 @@ export class MahjongTable {
     fill.position.set(8, 6, -4);
     this.scene.add(fill);
     this.buildTable();
+    this.setTheme(theme);
     this.observer = new ResizeObserver(() => this.resize());
     this.observer.observe(container);
     this.resize();
@@ -86,25 +93,27 @@ export class MahjongTable {
     this.motionPreference.addEventListener('change', this.wake);
     this.wake();
   }
+  setTheme(theme: TableTheme) {
+    const palette = TABLE_THEMES[theme];
+    this.felt.color.setHex(palette.felt);
+    this.wood.color.setHex(palette.frame);
+    this.trim.color.setHex(palette.trim);
+    this.ambient.color.setHex(palette.sky);
+    this.ambient.groundColor.setHex(palette.ground);
+    this.ambient.intensity = palette.light;
+    this.container.dataset.theme = theme;
+    this.wake();
+  }
   private buildTable() {
-    const base = new THREE.Mesh(
-      new RoundedBoxGeometry(12.25, 0.7, 12.25, 4, 0.45),
-      new THREE.MeshStandardMaterial({ color: 0x173a31, roughness: 0.55, metalness: 0.08 }),
-    );
+    const base = new THREE.Mesh(new RoundedBoxGeometry(12.25, 0.7, 12.25, 4, 0.45), this.wood);
     base.position.y = -0.47;
     base.receiveShadow = true;
     base.castShadow = true;
     this.scene.add(base);
-    const trim = new THREE.Mesh(
-      new RoundedBoxGeometry(11.91, 0.12, 11.91, 4, 0.3),
-      new THREE.MeshStandardMaterial({ color: 0xb29a65, roughness: 0.52, metalness: 0.42 }),
-    );
+    const trim = new THREE.Mesh(new RoundedBoxGeometry(11.91, 0.12, 11.91, 4, 0.3), this.trim);
     trim.position.y = -0.125;
     this.scene.add(trim);
-    const felt = new THREE.Mesh(
-      new RoundedBoxGeometry(11.78, 0.15, 11.78, 4, 0.28),
-      new THREE.MeshStandardMaterial({ color: 0x28654e, roughness: 1 }),
-    );
+    const felt = new THREE.Mesh(new RoundedBoxGeometry(11.78, 0.15, 11.78, 4, 0.28), this.felt);
     felt.position.y = -0.11;
     felt.receiveShadow = true;
     this.scene.add(felt);
@@ -238,7 +247,9 @@ export class MahjongTable {
     };
     players.forEach((p, seat) => {
       const relative = (seat - me + 4) % 4;
-      const length = p.tileCount;
+      // The HTML rack is the local player's sole concealed hand and input surface.
+      // Public melds and discards remain here alongside opponents' concealed backs.
+      const length = !this.preview && relative === 0 ? 0 : p.tileCount;
       for (let i = 0; i < length; i++) {
         const t = p.hand[i] ?? null,
           pt = transform((i - (length - 1) / 2) * 0.47, 4.9, relative);

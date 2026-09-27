@@ -1,0 +1,648 @@
+/* Four Winds' original wind garden. The lobby always belongs to Jade Night. */
+:root {
+  --paper: #091c19;
+  --cream: #122c26;
+  --green: #a3d9b9;
+  --line: #2c4940;
+  --muted: #adc3b6;
+  --gold: #ff9a6b;
+  --surface: #102a23;
+  --surface-raised: #18382f;
+  --ink: #f0f3e8;
+  --subtle: #b4cbbd;
+  --edge: #456257;
+  --accent: #a3d9b9;
+  --accent-ink: #10291f;
+  --warm: #ffab7d;
+  --environment: radial-gradient(ellipse at 50% 40%, #234c38, #081d19 76%);
+  color: var(--ink);
+  background: #071814;
+}
+body {
+  background: #071814;
+}
+.site-header {
+  background: #091c19;
+  height: 82px;
+}
+.main-nav button.active {
+  color: var(--warm);
+}
+.main-nav button.active:after {
+  background: var(--warm);
+}
+.brand > span {
+  letter-spacing: -0.8px;
+}
+.hero {
+  background:
+    linear-gradient(90deg, #0b211ff2 8%, #0b211f55 65%),
+    url('/art/wind-garden.svg') center / cover,
+    #103328;
+  border-color: #355546;
+  border-radius: 16px;
+}
+.hero h1 em {
+  font-style: normal;
+  font-weight: 700;
+  color: #a3d9b9;
+}
+.hero-halo {
+  opacity: 0.5;
+}
+.hero-foot .tiny-star {
+  color: var(--warm);
+}
+.hero p {
+  font-size: 14px;
+}
+.hero-copy {
+  padding-top: 40px;
+}
+.button.gold,
+.button.gold:hover:not(:disabled) {
+  background: #ff9a6b;
+  color: #2b1b12;
+}
+.button.primary,
+.button.primary:hover:not(:disabled) {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.button.outline,
+.button.outline:hover:not(:disabled) {
+  background: var(--surface-raised);
+  color: var(--ink);
+  border-color: var(--edge);
+}
+.text-button:hover {
+  color: var(--warm);
+}
+.preset-card,
+.saved-rule,
+.practice-card,
+.rooms-panel,
+.learn-card,
+.rules-empty,
+.room-row,
+.empty-tables {
+  background: var(--surface);
+}
+.preset-card {
+  background: linear-gradient(125deg, #1c4033, #0d251f);
+}
+.preset-card .preset-art {
+  background: radial-gradient(ellipse, #71ad7840, transparent 70%);
+}
+.preset-riichi .preset-art {
+  background: radial-gradient(ellipse, #789eaf35, transparent 70%);
+}
+.preset-singapore .preset-art {
+  background: radial-gradient(ellipse, #dd946535, transparent 70%);
+}
+.circle-arrow {
+  background: #a3d9b9;
+  color: #153c2d;
+  border: 0;
+}
+.room-row:hover {
+  background: #1b3d30;
+}
+.preset-content h3 {
+  font-size: 23px;
+}
+.preset-art .art-watermark {
+  color: #a3d9b922;
+}
+.preset-bottom {
+  color: var(--subtle);
+}
+.site-footer {
+  background: #091c19;
+}
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+summary:focus-visible {
+  outline-color: var(--warm);
+}
+
+/* Theme scope is local to the table and its dialogs, leaving the club unchanged. */
+body.in-game[data-table-theme='porcelain-day'] {
+  --paper: #f6f2e9;
+  --cream: #eae4d8;
+  --green: #164b58;
+  --muted: #506771;
+  --line: #d2cbbb;
+  --surface: #faf6ed;
+  --surface-raised: #ede7da;
+  --ink: #14364b;
+  --subtle: #506570;
+  --edge: #b8b6a9;
+  --accent: #174f60;
+  --accent-ink: #fffaf0;
+  --warm: #ae4824;
+  --environment:
+    repeating-linear-gradient(125deg, #ffffff00 0 100px, #ffffff45 100px 150px),
+    radial-gradient(ellipse at 40% 25%, #fffdf5, #dcd5c5);
+}
+.game-window,
+.game-toolbar,
+.game-dock,
+body.in-game dialog {
+  color: var(--ink);
+  background: var(--surface);
+}
+.game-toolbar {
+  border-color: var(--edge);
+}
+.game-wordmark,
+.game-toolbar .icon-button,
+.table-title > strong,
+.game-window .text-button {
+  color: var(--ink);
+}
+.game-window .game-table {
+  background:
+    url('/art/wind-garden.svg') center / cover,
+    var(--environment);
+}
+body[data-table-theme='porcelain-day'] .game-window .game-table {
+  background: var(--environment);
+}
+body[data-table-theme='porcelain-day'] .table-grain {
+  opacity: 0.08;
+}
+.game-window .game-table:after {
+  border-color: var(--edge);
+  opacity: 0.3;
+}
+.game-dock {
+  border-top: 1px solid var(--edge);
+  box-shadow: 0 -12px 35px #0002;
+}
+.game-window .player-badge,
+.last-action,
+.game-window .waiting-message,
+.board-call-status,
+.game-window .table-tag {
+  background: var(--surface);
+  color: var(--ink);
+  border-color: var(--edge);
+}
+.game-window .player-badge {
+  border-left: 1px solid var(--edge);
+  border-radius: 12px;
+}
+.game-window .player-badge .avatar {
+  border-radius: 50%;
+}
+.game-window .player-badge.current-player {
+  border-color: var(--warm);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--warm) 25%, transparent);
+}
+.game-window .player-badge small,
+.last-action small,
+.action-context small,
+.game-window .round-label small,
+.game-window .waiting-message p {
+  color: var(--subtle);
+}
+.game-window .player-badge .seat-wind {
+  color: var(--accent);
+  text-align: center;
+  font-size: 23px;
+}
+.game-window .seat-wind small {
+  display: block;
+  font:
+    600 8px 'DM Sans',
+    sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+.seat-turn {
+  color: var(--warm);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+.game-window .seat-timer {
+  background: #ffac7c;
+  color: #332013;
+}
+.game-window .round-label,
+.game-window .waiting-message h2,
+.last-action strong {
+  color: var(--ink);
+}
+.action-context strong,
+.claim-active .action-context strong,
+.action-context b,
+.turn-label.your-turn,
+.action-symbol,
+.action-placeholder {
+  color: var(--warm);
+}
+.game-window .action-bar {
+  border-color: var(--edge);
+}
+.game-window .action-bar.claim-active {
+  border-color: var(--warm);
+}
+.turn-seal {
+  color: var(--warm);
+  background: color-mix(in srgb, var(--warm) 8%, transparent);
+  border-color: var(--warm);
+  border-radius: 8px;
+}
+.game-window .discard-button,
+.game-window .discard-button:hover:not(:disabled) {
+  background: #ff9a6b;
+  color: #2b1b12;
+}
+.turn-label,
+.rack-tip,
+.game-window .your-wind {
+  color: var(--subtle);
+}
+.hand-insight-button {
+  color: var(--ink);
+  border-color: var(--edge);
+  background: transparent;
+}
+.hand-insight-button b {
+  color: var(--warm);
+}
+.game-window .hand-tiles .tile.selected {
+  border-color: #e87c42;
+  box-shadow:
+    0 0 0 2px #eb854d,
+    0 5px 16px #e87c4240;
+}
+.game-window .hand-tiles .tile.drawn:after {
+  border-color: #b57528;
+}
+body[data-table-theme='porcelain-day'] .game-window .hand-tiles .tile {
+  box-shadow:
+    0 4px 0 #76978b,
+    0 6px 12px #12352b25;
+}
+.game-window .claim-time-bar {
+  background: var(--edge);
+}
+.game-window .claim-time-bar i {
+  background: var(--warm);
+  box-shadow: none;
+}
+.game-window .rule-pill {
+  color: var(--ink);
+  border-color: var(--edge);
+}
+.game-window .rule-pill.has-changes {
+  color: var(--warm);
+}
+.game-connection {
+  color: var(--accent);
+}
+.theme-settings {
+  margin: 0 0 22px;
+}
+.theme-settings h3 {
+  font-size: 18px;
+}
+.theme-settings p {
+  font-size: 12px;
+  color: var(--subtle);
+  margin: 5px 0 12px;
+}
+.theme-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.theme-option {
+  padding: 9px;
+  text-align: left;
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+  color: var(--ink);
+  min-width: 0;
+}
+.theme-option[aria-pressed='true'] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+.theme-option strong {
+  display: block;
+  margin: 10px 3px 4px;
+  font-size: 13px;
+}
+.theme-option small {
+  display: block;
+  color: var(--subtle);
+  font-size: 11px;
+  line-height: 1.5;
+  margin: 0 3px 4px;
+}
+.theme-swatch {
+  display: flex;
+  align-items: center;
+  justify-content: space-evenly;
+  height: 70px;
+  border-radius: 7px;
+  font: 25px serif;
+  border: 1px solid #77918260;
+}
+.theme-swatch i {
+  font-style: normal;
+  font-size: 32px;
+}
+.theme-swatch.jade-night {
+  color: #a3d9b9;
+  background: radial-gradient(ellipse, #245f46, #081d19);
+}
+.theme-swatch.jade-night i {
+  color: #ff9a6b;
+}
+.theme-swatch.porcelain-day {
+  color: #174f60;
+  background: linear-gradient(125deg, #e4dccb, #fffdf5);
+}
+.theme-swatch.porcelain-day i {
+  color: #b36d32;
+}
+
+/* Readouts and dialogs use the same palette as the table beneath them. */
+body.in-game :is(dialog, .discard-ledger, .game-drawer) {
+  background: var(--surface);
+  color: var(--ink);
+  border-color: var(--edge);
+}
+body.in-game
+  :is(input, select, .rule-tabs, .editor-footer, .check-row, .discard-group, .hand-insight-button) {
+  background: var(--surface-raised);
+  color: var(--ink);
+  border-color: var(--edge);
+}
+body.in-game
+  :is(
+    .dialog-intro,
+    .form-note,
+    label,
+    label > small,
+    .check-row small,
+    .field-help,
+    .help-body p,
+    .help-variant small,
+    .settings-status,
+    .rule-chip small,
+    .discard-ledger header small,
+    .discard-ledger > p,
+    .discard-group small,
+    .route-assumptions,
+    .winning-route small,
+    .pair-candidates > span:first-child,
+    .next-hand-clock,
+    .hand-legend,
+    .log-entry time,
+    .rack-tools .text-button
+  ) {
+  color: var(--subtle);
+}
+body.in-game
+  :is(
+    legend,
+    .check-row strong,
+    .help-steps strong,
+    .help-lead p,
+    .help-variant h3,
+    .discard-ledger header strong,
+    .discard-group strong,
+    .winning-route h3,
+    .log-entry p
+  ) {
+  color: var(--ink);
+}
+body.in-game
+  :is(
+    .rule-readout > .modified,
+    .rule-chip i,
+    .hand-route span,
+    .winning-route header strong,
+    .route-patterns b,
+    .next-hand-status > strong,
+    .qualification-total,
+    #rules-form label.modified-field
+  ) {
+  color: var(--warm);
+}
+body.in-game
+  :is(
+    .rule-chip,
+    .rule-readout > div,
+    #rules-form fieldset,
+    .winning-route,
+    .set-slots > span,
+    .winning-group,
+    .game-window .exposed-meld,
+    .detail-melds .exposed-meld,
+    .help-variant,
+    .score-patterns > div
+  ) {
+  border-color: var(--edge);
+}
+body.in-game .rule-tabs button {
+  color: var(--subtle);
+}
+body.in-game .rule-tabs button[aria-selected='true'] {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+body[data-table-theme='porcelain-day']
+  :is(.meld-chow, .meld-pung, .meld-kong, .meld-bonus, .winning-group) {
+  --meld-color: #28635a;
+}
+body[data-table-theme='porcelain-day'] .meld-chow {
+  --meld-color: #25658e;
+}
+body[data-table-theme='porcelain-day'] .meld-kong {
+  --meld-color: #995421;
+}
+body[data-table-theme='porcelain-day'] .meld-bonus {
+  --meld-color: #925377;
+}
+body[data-table-theme='porcelain-day']
+  :is(.set-slots > span, .set-slots > .filled, .exposed-meld small b) {
+  color: var(--accent);
+}
+body[data-table-theme='porcelain-day'] .winning-group > small {
+  color: var(--meld-color);
+}
+body[data-table-theme='porcelain-day'] .result-scores {
+  color: var(--ink);
+}
+body[data-table-theme='porcelain-day'] .result-scores strong.positive {
+  color: #216448;
+}
+body[data-table-theme='porcelain-day'] .result-scores strong.negative {
+  color: #ab452c;
+}
+
+@media (max-width: 650px) {
+  .site-header {
+    height: auto;
+    min-height: 76px;
+  }
+  .hero-copy {
+    padding: 30px 25px;
+  }
+  .hero p {
+    font-size: 12px;
+  }
+  .preset-content h3 {
+    font-size: 20px;
+  }
+  .seat-turn {
+    display: none;
+  }
+  .game-window .seat-wind small {
+    font-size: 7px;
+  }
+  .theme-options {
+    gap: 8px;
+  }
+  .theme-option small {
+    font-size: 10px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *:before,
+  *:after {
+    scroll-behavior: auto !important;
+  }
+  .button,
+  .preset-card,
+  .theme-option {
+    transition: none;
+  }
+  .button:hover:not(:disabled),
+  .preset-card:hover {
+    transform: none;
+  }
+  .game-window .hand-tiles .tile.selected {
+    transform: none !important;
+  }
+}
+
+body.in-game :is(.game-drawer > header, .game-drawer .table-info h3, .discard-ledger .icon-button) {
+  color: var(--ink);
+}
+body.in-game :is(.discard-group > strong span, #discard-groups .ledger-empty) {
+  color: var(--subtle);
+}
+body.in-game .discard-group > em {
+  color: var(--warm);
+}
+.game-window .player-badge .seat-wind {
+  line-height: 1.05;
+}
+.game-window .seat-wind small {
+  margin-top: 4px;
+}
+body[data-table-theme='porcelain-day'] .game-window .round-label > span {
+  color: var(--ink);
+}
+body[data-table-theme='porcelain-day'] .score-hint {
+  color: #65451c;
+  background: #ece1c9;
+  border-color: #bca67c;
+}
+body[data-table-theme='porcelain-day'] .score-hint.qualified {
+  color: #285e41;
+  background: #dfebdd;
+  border-color: #80a189;
+}
+@media (min-width: 651px) and (min-height: 621px) {
+  .game-window .position-2 {
+    top: 8px;
+  }
+}
+@media (max-width: 650px) {
+  .game-window .claim-active .action-buttons {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .game-window .claim-active .action-buttons .button {
+    min-width: 0;
+    gap: 3px;
+    padding: 6px 4px;
+  }
+  .game-window .claim-active .action-buttons .button > span:last-child {
+    white-space: normal;
+    line-height: 1.3;
+  }
+  .game-window .claim-active [data-action='pass']:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+  .board-call-status {
+    display: none;
+  }
+}
+@media (max-height: 500px) and (min-width: 651px) and (max-width: 1100px) {
+  .game-window .claim-active .action-buttons {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+  }
+  .game-window .claim-active .action-buttons .button {
+    min-width: 0;
+    min-height: 44px;
+    gap: 3px;
+    padding: 4px;
+    white-space: normal;
+  }
+  /* The offered tile stays visible; each chow's text identifies its exact sequence. */
+  .game-window .claim-active .action-buttons :is(.tile.tiny, .action-glyph) {
+    display: none;
+  }
+  .game-window .claim-active [data-action='pass']:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+  .claim-active .claim-tile {
+    width: 27px;
+    height: 37px;
+  }
+  .game-window .hand-tiles {
+    padding: 4px 0;
+    gap: 5px 3px;
+  }
+  .game-window .hand-tiles .tile {
+    width: 32px;
+    height: 44px;
+  }
+  .game-window .hand-header {
+    padding: 3px 0;
+  }
+  .game-window .hand-insight-button {
+    min-height: 20px;
+    padding: 2px 5px;
+  }
+  .board-call-status {
+    display: none;
+  }
+}
+@media (max-height: 500px) and (min-width: 651px) and (max-width: 1100px) {
+  /* The claim dock already names this decision; keep the rack tools on one row. */
+  .game-window:has(.claim-active) #hand-guidance {
+    display: none;
+  }
+}
+.game-window .seat-online {
+  top: 6px;
+  right: 6px;
+  bottom: auto;
+  left: auto;
+}
