@@ -650,39 +650,6 @@ body[data-environment='rain'] .lotus > i {
 .game-window .player-name-button {
   pointer-events: auto;
 }
-.game-window .position-1 {
-  left: auto;
-  right: 24px;
-}
-.game-window .position-3 {
-  right: auto;
-  left: 24px;
-}
-.game-window .discard-ledger {
-  position: absolute;
-  left: calc(100% + 12px);
-  top: 50%;
-  bottom: auto;
-  transform: translateY(-50%);
-  width: min(450px, calc(50cqw - 110px));
-  min-height: 180px;
-  max-height: calc(100cqh - 35px);
-}
-.game-window #discard-groups {
-  min-height: 65px;
-}
-@media (max-width: 700px) {
-  .game-window .position-1 {
-    right: 10px;
-  }
-  .game-window .position-3 {
-    left: 10px;
-  }
-
-  .game-window #discard-groups {
-    min-height: 40px;
-  }
-}
 .rain-drops {
   position: absolute;
   right: 35px;
@@ -750,19 +717,4 @@ body[data-environment='rain'] .blooming .rain-drops i {
 .game-window .shuffle-label,
 .game-window .deal-label {
   animation-duration: 2.1s;
-}
-
-@media (max-width: 900px) {
-  .game-window .discard-ledger {
-    left: calc(50cqw - var(--discard-x, 58cqw) + 22px);
-    top: auto;
-    bottom: calc(100% + 8px);
-    transform: translateX(-50%);
-    width: min(500px, calc(100cqw - 24px));
-    min-height: 0;
-    max-height: max(110px, calc(var(--discard-y, 54cqh) - 38px));
-  }
-  .game-window #discard-groups {
-    min-height: 40px;
-  }
 }

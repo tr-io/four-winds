@@ -55,9 +55,11 @@ export function showTileTooltip(
 }
 export function installTileTooltips() {
   let touch: { tile: HTMLElement; x: number; y: number; moved: boolean } | undefined;
+  let mouse: { x: number; y: number } | undefined;
   const target = (event: Event) =>
     (event.target as Element).closest<HTMLElement>('[data-tile-name]');
   document.addEventListener('pointerover', (event) => {
+    if (event.pointerType === 'mouse') mouse = { x: event.clientX, y: event.clientY };
     const tile = target(event);
     if (tile && event.pointerType === 'mouse' && !event.buttons)
       showTileTooltip(
@@ -87,6 +89,7 @@ export function installTileTooltips() {
         : undefined;
   });
   document.addEventListener('pointermove', (event) => {
+    if (event.pointerType === 'mouse') mouse = { x: event.clientX, y: event.clientY };
     if (touch && Math.hypot(event.clientX - touch.x, event.clientY - touch.y) >= 7)
       touch.moved = true;
     if (event.buttons) hideTileTooltip();
@@ -114,6 +117,25 @@ export function installTileTooltips() {
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') hideTileTooltip();
   });
-  document.addEventListener('scroll', hideTileTooltip, true);
+  document.addEventListener(
+    'scroll',
+    () => {
+      // Zoomed layouts scroll. Keep an HTML tile's label attached through automatic
+      // focus scrolling, or while it remains under a stationary mouse pointer.
+      if (
+        owner?.isConnected &&
+        (owner === document.activeElement ||
+          (mouse && owner.contains(document.elementFromPoint(mouse.x, mouse.y))))
+      ) {
+        const rect = owner.getBoundingClientRect();
+        if (rect.bottom > 0 && rect.top < innerHeight && rect.right > 0 && rect.left < innerWidth) {
+          showTileTooltip(owner.dataset.tileName!, rect.left + rect.width / 2, rect.top, owner);
+          return;
+        }
+      }
+      hideTileTooltip();
+    },
+    true,
+  );
   window.addEventListener('resize', hideTileTooltip);
 }
