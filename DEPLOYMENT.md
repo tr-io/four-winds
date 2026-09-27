@@ -109,14 +109,26 @@ ssh root@YOUR_DROPLET_IP
 apt update
 apt upgrade -y
 apt install -y ca-certificates curl git python3 sudo unattended-upgrades
-adduser operator
-usermod -aG sudo operator
-install -d -m 700 -o operator -g operator /home/operator/.ssh
-install -m 600 -o operator -g operator /root/.ssh/authorized_keys /home/operator/.ssh/authorized_keys
 ```
 
-Open **a second terminal** and verify `ssh operator@YOUR_DROPLET_IP` and `sudo -v` work. Keep the
-original session open until verified. Then, as `operator`, disable password SSH and root SSH:
+Create the administrator account as root. Set a password when prompted; it is used for `sudo`.
+The commands after `adduser` run only if account creation succeeds:
+
+```sh
+adduser fwadmin &&
+usermod -aG sudo fwadmin &&
+install -d -m 700 -o fwadmin -g fwadmin /home/fwadmin/.ssh &&
+install -m 600 -o fwadmin -g fwadmin /root/.ssh/authorized_keys /home/fwadmin/.ssh/authorized_keys
+```
+
+**Recovering from the earlier `adduser operator` error:** Ubuntu already has a system group named
+`operator`, so that command fails before creating the user. Leave the system group in place and
+run the `fwadmin` block above as root. Use `fwadmin` throughout the remaining steps. If you already
+have a working administrator account, substitute its username, primary group, and home directory.
+[Debian reserved account names](https://sources.debian.org/src/user-setup/1.81/reserved-usernames/)
+
+Open **a second terminal** and verify `ssh fwadmin@YOUR_DROPLET_IP` and `sudo -v` work. Keep the
+original session open until verified. Then, as `fwadmin`, disable password SSH and root SSH:
 
 ```sh
 sudo tee /etc/ssh/sshd_config.d/00-four-winds.conf >/dev/null <<'CONFIG'
@@ -131,7 +143,7 @@ sudo dpkg-reconfigure --priority=low unattended-upgrades
 ```
 
 Keep your administrator's personal key separate from the CI key. Check that another new
-`operator` session still works. Retain DigitalOcean console access for recovery.
+`fwadmin` session still works. Retain DigitalOcean console access for recovery.
 
 Install Docker Engine and Compose from Docker's official Ubuntu repository:
 
@@ -172,8 +184,8 @@ ssh-keygen -t ed25519 -f ~/.ssh/four-winds-ci -C four-winds-ci -N ''
 From this repository, copy the deployment files and **public** key using your personal admin key:
 
 ```sh
-ssh operator@YOUR_DROPLET_IP 'mkdir -p ~/four-winds-install'
-scp -r deploy Caddyfile ~/.ssh/four-winds-ci.pub operator@YOUR_DROPLET_IP:~/four-winds-install/
+ssh fwadmin@YOUR_DROPLET_IP 'mkdir -p ~/four-winds-install'
+scp -r deploy Caddyfile ~/.ssh/four-winds-ci.pub fwadmin@YOUR_DROPLET_IP:~/four-winds-install/
 ```
 
 On the VPS:
@@ -354,16 +366,16 @@ so a scheduled file copy captures one complete saved snapshot. Deploy snapshots 
 stopped. Check `journalctl -u four-winds-backup.service` for backup failures.
 
 **Copy backups off the Droplet.** Example, run from your computer using the personal admin key
-and an account whose sudo policy permits this command (ordinary `operator` sudo may prompt; run
+and an account whose sudo policy permits this command (ordinary `fwadmin` sudo may prompt; run
 it interactively first or arrange a narrowly scoped backup-export command):
 
 ```sh
 # On the VPS, create a private export for your administrator account:
-sudo tar -C /opt/four-winds -czf /home/operator/four-winds-backups.tgz backups
-sudo chown operator:operator /home/operator/four-winds-backups.tgz
-sudo chmod 600 /home/operator/four-winds-backups.tgz
+sudo tar -C /opt/four-winds -czf /home/fwadmin/four-winds-backups.tgz backups
+sudo chown fwadmin:fwadmin /home/fwadmin/four-winds-backups.tgz
+sudo chmod 600 /home/fwadmin/four-winds-backups.tgz
 # On your computer:
-scp operator@YOUR_DROPLET_IP:~/four-winds-backups.tgz ./four-winds-backups.tgz
+scp fwadmin@YOUR_DROPLET_IP:~/four-winds-backups.tgz ./four-winds-backups.tgz
 ```
 
 Store exports outside the repository, encrypt them in your backup system, and remove staging

@@ -10,7 +10,8 @@ before relying on the snapshot. Start with the user's latest request.
 2. Check GitHub Actions for the latest commit. The full workflow for **`48bd23c` passed**;
    the workflow for **`5da0447` was still running** when this handoff was written.
 3. Feature requests through the saved-table fix are implemented. No feature task is currently
-   unfinished. DigitalOcean provisioning and the first production release remain to be done.
+   unfinished. The user has created a DigitalOcean Droplet and is setting up its administrator
+   account. Server setup and the first production release remain to be completed.
 4. Use the guides below for testing or deployment; keep saved games and browser identities intact.
 
 ## User preferences and decisions
@@ -111,10 +112,17 @@ Checked-in workflows test pushes/PRs, build/publish a GHCR image for a published
 deploy.** Manual rollback restores the previous image while preserving current game state;
 restoring old state is a separate administrator operation.
 
-The user still needs to create the Ubuntu Droplet, set DNS, install the restricted controller,
+The user has created the Ubuntu Droplet and encountered `adduser operator` failing because
+Ubuntu already has an `operator` system group. The guide now uses **`fwadmin`** for the personal
+administrator throughout account setup, SSH, file uploads, and backup exports; **`fwdeploy`** is
+still the separate restricted CI account. The conflict and replacement account's sudo membership
+and SSH file permissions were verified in a disposable Ubuntu 24 container. Keep the original
+root session open until a second terminal verifies the new administrator's SSH and sudo access.
+
+The user still needs to finish server setup, verify DNS, install the restricted controller,
 configure registry access and GitHub's `production` environment secrets, then publish the first
-release. No VPS was provisioned and no production release was deployed in this session. Actual
-domain/IP/key values have not been supplied. Keep credentials out of the repository and memory.
+release. Production deployment remains unverified. Actual domain/IP/key values have not been
+supplied. Keep credentials out of the repository and memory.
 
 ## Local environment notes
 
