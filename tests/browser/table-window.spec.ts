@@ -1,5 +1,6 @@
 import { expect } from '@playwright/test';
 import { PerspectiveCamera, Vector3 } from 'three';
+import { tableFieldOfView } from '../../client/table-camera';
 import { applyAction, gameView } from '../../server/engine';
 import { test, setup, order, inViewport } from '../fixtures/table';
 
@@ -277,7 +278,7 @@ test('3D face inspection names visible tiles and never reveals a concealed tile'
   const game = await setup(page, tableServer, 'complete');
   const rect = (await page.locator('#live-table canvas').boundingBox())!;
   const aspect = rect.width / rect.height;
-  const camera = new PerspectiveCamera(aspect < 1.1 ? 56 : 40, aspect, 0.1, 100);
+  const camera = new PerspectiveCamera(tableFieldOfView(aspect), aspect, 0.1, 100);
   camera.position.set(0, 15, 12);
   camera.lookAt(0, 0, 0.7);
   camera.updateMatrixWorld();

@@ -5,10 +5,17 @@ before relying on the snapshot. Start with the user's latest request.
 
 ## Resume here
 
-1. Current work is on **`feat/social-table-experience`**, based on merged UI PR #1 (`65fb71e`).
-   Pushed as [PR #2](https://github.com/tr-io/four-winds/pull/2). The user requested social/table
-   features and an interactive How to Play page. Local verification passed; GitHub CI is running.
-   Check Git and CI before relying on this snapshot.
+1. Current bug fixes are on **`fix/table-visibility-and-zoom`**, stacked on
+   `feat/social-table-experience` ([PR #2](https://github.com/tr-io/four-winds/pull/2), still open;
+   its CI passed). The top opponent hand was rendered but covered by its player card. Short
+   viewports also overlapped seat cards with recent actions and clipped the discard ledger.
+   `client/table-viewport.css` now reserves room around the canvas, and `table-camera.ts` fits
+   the whole table to that space. Short windows scroll internally. The ledger opens above its
+   bottom-right button, keeps tile faces from shrinking, and scrolls into view when pinned or
+   focused. Tile tooltips follow focused/hovered tiles during scroll. All opponent faces remain
+   concealed; the local hand remains in the HTML rack. Nine new regressions cover live viewport
+   resizing, seat/hand occlusion, ledger clipping, action access, and focused tooltips. Review the
+   fix against the feature branch so its PR contains only these corrections. Keep main unchanged.
 2. **How to play** is now an interactive page with preset switching, tile explanations, a moving
    turn walkthrough, hand grouping/checking, and competing-claim examples. `server/lessons.ts`
    validates separate preset examples through the existing engine in isolated games; scoring,
@@ -24,11 +31,15 @@ before relying on the snapshot. Start with the user's latest request.
    Tile dimensions/rows and wall corners are separated. Opponent concealed faces are never built
    in Three.js, including when rotating. Existing saved games use a count-based wall fallback
    until their next deal. Stable seats and initial host-as-East are preserved.
-5. Verification so far: **92 unit/network tests**, **28 desktop browser tests** (27-suite pass plus the new notification check),
-   **12 mobile tests** (Android Chrome/iPhone WebKit), build/type, formatting, five deployment
-   tests, and release Compose validation pass. Local screenshots are in `.cache/ui-review/` (ignored).
-   All browser fixtures use isolated stores; production has not been changed. The local review
-   server at **localhost:3102** uses `/tmp/four-winds-feature-review.json`, separate from user data.
+5. Verification for the table/zoom fix: **92 unit/network tests**, **37 desktop browser tests**,
+   **12 mobile tests** (Android Chrome/iPhone WebKit), type/build, formatting, and diff checks pass.
+   The iPhone opening deal exposed an 18px rack overflow; the board minimum is now 360px, with
+   320px reserved for the landscape split layout. Viewport tests cover 320, 390, 640, 700, 768,
+   844, 960, and 1280 CSS pixels, including resizing after mount. Screenshots are in
+   `.cache/ui-review/table-zoom/` (ignored). All tests use isolated stores; production is unchanged.
+   The prior feature work also passed five deployment tests and release Compose validation.
+   The local review server at **localhost:3102** was last started with
+   `/tmp/four-winds-feature-review.json`; check availability before using it.
 
 ## User preferences and decisions
 

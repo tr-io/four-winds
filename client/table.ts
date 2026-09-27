@@ -9,6 +9,7 @@ import { kind, tileName } from '../shared/tiles';
 import { hideTileTooltip, showTileTooltip } from './tile-tooltip';
 import { DEAL } from './deal-sequence';
 import { TABLE_THEMES, type TableTheme } from './table-theme';
+import { tableFieldOfView } from './table-camera';
 type Piece = {
   group: THREE.Group;
   face: THREE.Mesh;
@@ -423,23 +424,8 @@ export class MahjongTable {
     if (!w || !h) return;
     this.renderer.setSize(w, h);
     this.camera.aspect = w / h;
-    this.camera.fov = this.preview ? (w / h < 1.2 ? 54 : 43) : w / h < 1.1 ? 56 : 40;
+    this.camera.fov = this.preview ? (w / h < 1.2 ? 54 : 43) : tableFieldOfView(w / h);
     this.camera.updateProjectionMatrix();
-    if (!this.preview) {
-      this.camera.updateMatrixWorld();
-      const point = new THREE.Vector3(2.4, 0.3, 1.6).project(this.camera);
-      const parent = this.container.parentElement!;
-      const rect = this.container.getBoundingClientRect(),
-        board = parent.getBoundingClientRect();
-      parent.style.setProperty(
-        '--discard-x',
-        `${rect.left - board.left + ((point.x + 1) / 2) * w}px`,
-      );
-      parent.style.setProperty(
-        '--discard-y',
-        `${rect.top - board.top + ((1 - point.y) / 2) * h}px`,
-      );
-    }
     this.wake();
   }
   private wake = () => {
