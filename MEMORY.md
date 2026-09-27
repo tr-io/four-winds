@@ -8,8 +8,8 @@ before relying on the snapshot. Start with the user's latest request.
 1. Current work is on **`fix/table-hands-and-player-inspection`**, based on freshly pulled
    `main` at `a25a265`. [PR #2](https://github.com/tr-io/four-winds/pull/2) and the workflow/handoff
    [PR #4](https://github.com/tr-io/four-winds/pull/4) are merged. The user explicitly requested
-   a new branch from updated main for this fix. Commit, push, and open a new PR; check its state
-   before future follow-ups.
+   a new branch from updated main for this fix. Changes are committed and pushed to
+   [PR #5](https://github.com/tr-io/four-winds/pull/5); check its state before future follow-ups.
    The latest screenshot's missing row was the **local player's hand**: `table.ts` explicitly
    skipped it in live games. All four hands now appear on the board, with only the viewer's own
    faces visible. The HTML rack remains the input surface. All hand rows share opening-deal
