@@ -50,6 +50,7 @@ export class MahjongTable {
   }
   private controls: OrbitControls;
   private openingUntil = 0;
+  private handPieces = new Set<string>();
   private preview: boolean;
   private disposed = false;
   private impactAt = -10000;
@@ -281,15 +282,18 @@ export class MahjongTable {
       this.put(id, tile, x, z, r, y);
     };
     const transform = seatPoint;
+    this.handPieces.clear();
     players.forEach((p, seat) => {
       const relative = (seat - me + 4) % 4;
-      // The HTML rack is the local player's sole concealed hand and input surface.
-      // Public melds and discards remain here alongside opponents' concealed backs.
-      const length = !this.preview && relative === 0 ? 0 : p.tileCount;
+      // Show all four hands on the table; only the viewer's own faces are built.
+      // The HTML rack remains the input surface for selecting and discarding.
+      const length = p.tileCount;
       for (let i = 0; i < length; i++) {
         const t = relative === 0 ? (p.hand[i] ?? null) : null,
           pt = transform((i - (length - 1) / 2) * 0.32, 5.46, relative);
-        put(t !== null ? `t${t}` : `hidden${seat}:${i}`, t, pt.x, pt.z, pt.r);
+        const id = t !== null ? `t${t}` : `hidden${seat}:${i}`;
+        this.handPieces.add(id);
+        put(id, t, pt.x, pt.z, pt.r);
       }
       let di = 0;
       for (const d of p.discards) {
@@ -442,7 +446,7 @@ export class MahjongTable {
         this.pieces.delete(id);
         continue;
       }
-      if (id.startsWith('hidden')) p.group.visible = now >= this.openingUntil || this.reduced;
+      p.group.visible = !this.handPieces.has(id) || now >= this.openingUntil || this.reduced;
       if (this.reduced) {
         p.group.position.copy(p.target);
         p.group.rotation.y = p.rotation;
@@ -491,7 +495,7 @@ export class MahjongTable {
     );
     // Include backs as occluders. Never inspect a concealed face through another tile.
     const hit = this.raycaster.intersectObjects(
-      [...this.pieces.values()].map((p) => p.group),
+      [...this.pieces.values()].filter((p) => p.group.visible).map((p) => p.group),
       true,
     )[0];
     const tile = hit?.object.userData.tile;

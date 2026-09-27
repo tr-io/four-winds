@@ -5,19 +5,27 @@ before relying on the snapshot. Start with the user's latest request.
 
 ## Resume here
 
-1. Current documentation work is on **`docs/agent-workflow-handoff`**, based on `origin/main` at
-   `c21f804`. The user merged [PR #2](https://github.com/tr-io/four-winds/pull/2), including the
-   application, dependency, and test-fixture fixes through `5234e0d`. [PR #3](https://github.com/tr-io/four-winds/pull/3)
-   was already included. The user requested a new PR for the remaining `AGENTS.md` and `MEMORY.md`
-   updates. Follow-up work reuses a branch only while its PR is open; check GitHub before continuing.
-   The top opponent hand was rendered but covered by its player card. Short
-   viewports also overlapped seat cards with recent actions and clipped the discard ledger.
-   `client/table-viewport.css` now reserves room around the canvas, and `table-camera.ts` fits
-   the whole table to that space. Short windows scroll internally. The ledger opens above its
-   bottom-right button, keeps tile faces from shrinking, and scrolls into view when pinned or
-   focused. Tile tooltips follow focused/hovered tiles during scroll. All opponent faces remain
-   concealed; the local hand remains in the HTML rack. Nine new regressions cover live viewport
-   resizing, seat/hand occlusion, ledger clipping, action access, and focused tooltips.
+1. Current work is on **`fix/table-hands-and-player-inspection`**, based on freshly pulled
+   `main` at `a25a265`. [PR #2](https://github.com/tr-io/four-winds/pull/2) and the workflow/handoff
+   [PR #4](https://github.com/tr-io/four-winds/pull/4) are merged. The user explicitly requested
+   a new branch from updated main for this fix. Commit, push, and open a new PR; check its state
+   before future follow-ups.
+   The latest screenshot's missing row was the **local player's hand**: `table.ts` explicitly
+   skipped it in live games. All four hands now appear on the board, with only the viewer's own
+   faces visible. The HTML rack remains the input surface. All hand rows share opening-deal
+   visibility; a tile moved into discards/melds becomes public immediately. Hidden animation
+   pieces are excluded from tooltip raycasts.
+   The whole player card is now a native button, including its avatar, points, and seat wind.
+   It opens melds, bonus tiles, and numbered discards in play order, with Called/Riichi labels.
+   Mouse, Enter/Space, and touch are covered. Opponent concealed hands stay private.
+   The prior viewport fix still reserves canvas space around the seat cards and keeps the
+   board/ledger usable at browser zoom. See `client/table-viewport.css` and `table-camera.ts`.
+   Verification on Node 24: **93 unit/network tests**, **38 desktop browser tests**, and
+   **14 mobile tests** (Android Chrome/iPhone WebKit) pass, along with types/build, formatting,
+   and diff checks. The missing-row regression failed before the renderer fix and passed after;
+   setup/reload tests now raycast every local face with normal and reduced motion. Viewport
+   checks include all four rows at eight sizes (320–1280px). Screenshots are in
+   `.cache/ui-review/player-tiles/` (ignored). Gameplay rules and production state are unchanged.
 2. **How to play** is now an interactive page with preset switching, tile explanations, a moving
    turn walkthrough, hand grouping/checking, and competing-claim examples. `server/lessons.ts`
    validates separate preset examples through the existing engine in isolated games; scoring,

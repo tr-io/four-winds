@@ -101,8 +101,8 @@
     padding: 6px;
     gap: 4px;
   }
-  .game-window .position-1 .player-name-button,
-  .game-window .position-3 .player-name-button {
+  .game-window .position-1 .player-name,
+  .game-window .position-3 .player-name {
     max-width: 42px;
   }
   .game-window .recent-actions {

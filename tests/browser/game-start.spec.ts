@@ -1,5 +1,7 @@
 import { expect } from '@playwright/test';
 import { test, setup, inViewport } from '../fixtures/table';
+import { tableProjection } from '../fixtures/table-view';
+import { tileName } from '../../shared/tiles';
 
 for (const reduced of [false, true]) {
   test(`game start shuffles and deals once with synchronized clacks; reduced motion ${reduced}`, async ({
@@ -45,9 +47,25 @@ for (const reduced of [false, true]) {
     await expect(page.locator('[data-effect="deal"]')).toHaveCount(0, { timeout: 4000 });
     await expect(page.locator('#live-table')).not.toHaveAttribute('data-deal', 'active');
     expect((await schedule()).length).toBe(count);
+    const hand = tableServer.service.rooms.get('TEST01')!.game!.players[0].hand;
+    const inspectOwnHand = async () => {
+      const point = await tableProjection(page);
+      for (const [i, tile] of hand.entries()) {
+        const own = point((i - (hand.length - 1) / 2) * 0.32, 5.46);
+        await expect
+          .poll(async () => {
+            await page.mouse.move(own.x, own.y);
+            const tooltip = page.getByRole('tooltip');
+            return (await tooltip.isVisible()) ? tooltip.textContent() : null;
+          })
+          .toBe(tileName(tile));
+      }
+    };
+    await inspectOwnHand();
     await page.reload();
     await expect(page.locator('.hand-tiles .tile')).toHaveCount(14);
     await expect(page.locator('[data-effect="deal"]')).toHaveCount(0);
     expect((await schedule()).length).toBe(0);
+    await inspectOwnHand();
   });
 }

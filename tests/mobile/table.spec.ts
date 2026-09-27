@@ -2,6 +2,32 @@ import { expect } from '@playwright/test';
 import { applyAction } from '../../server/engine';
 import { test, setup, order, inViewport } from '../fixtures/table';
 
+test('the whole player card opens public tiles by touch in portrait and landscape', async ({
+  page,
+  tableServer,
+}, testInfo) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await setup(page, tableServer, 'complete');
+  for (const viewport of [
+    { width: 390, height: 844 },
+    { width: 844, height: 390 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.getByRole('button', { name: 'Inspect Mei tiles' }).locator('.seat-wind').tap();
+    await expect(page.locator('dialog h2')).toHaveText('Mei');
+    await expect(page.locator('.player-discards .tile')).toHaveCount(6);
+    await page.locator('.player-discards .tile').last().tap();
+    await expect(page.getByRole('tooltip')).toHaveText('North');
+    await page.screenshot({
+      path: `test-results/${testInfo.project.name}-player-tiles-${viewport.width}.png`,
+    });
+    await page.getByRole('button', { name: 'Close dialog' }).tap();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+  }
+});
+
 test('touch tooltips, scored routes, and a pinned compact discard ledger fit portrait and landscape', async ({
   page,
   tableServer,
