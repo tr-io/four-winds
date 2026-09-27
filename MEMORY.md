@@ -5,7 +5,8 @@ before relying on the snapshot. Start with the user's latest request.
 
 ## Resume here
 
-1. Read `git status` and recent commits. The UI refresh is on **`feat/local-table-themes`**.
+1. Read `git status` and recent commits. The UI refresh is on **`feat/local-table-themes`**, pushed as
+   [PR #1](https://github.com/tr-io/four-winds/pull/1). GitHub CI was running at handoff.
    Follow the branch/PR workflow in AGENTS.md; the user replaced the old direct-to-main workflow.
 2. The club now uses a forest/jade palette with original vector lantern and wind-garden artwork.
    In-game **Table settings → Jade Night / Porcelain Day** changes local environment, felt,
