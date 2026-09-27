@@ -56,6 +56,11 @@ test('profile, saved rules, private lobby, four human seats, turn and reconnect'
   await expect(peers[0].page.locator('.hand-tiles .tile')).toHaveCount(13);
   await expect(page.locator('.table-entrance')).toHaveCSS('animation-name', 'table-enter');
   await expect(page.locator('#live-table canvas')).toHaveCount(1);
+  // The production Helmet policy must allow the separately bundled worker.
+  await page.getByRole('button', { name: 'Inspect your hand' }).click();
+  await page.getByRole('tab', { name: 'Winning routes', exact: true }).click();
+  await expect(page.locator('.winning-route, .routes-empty').first()).toBeVisible();
+  await page.getByRole('button', { name: 'Close dialog' }).click();
   await page.locator('.hand-tiles .tile.playable').first().click();
   await page.locator('.discard-button').click();
   await expect(page.locator('#log-entries')).toContainText('Avery discarded');

@@ -1,5 +1,5 @@
 import type { GameView } from '../shared/types';
-import { DEAL } from './deal-sequence';
+import { DEAL, dealSequence } from './deal-sequence';
 const calls: Record<string, [string, string]> = {
   pung: ['碰', 'PUNG'],
   chow: ['吃', 'CHOW'],
@@ -15,15 +15,20 @@ export class TableEffects {
   private seen = '';
   constructor(private host: HTMLElement) {}
   deal(game: GameView) {
-    const hand = game.handNumber;
+    const hand = game.handNumber,
+      sequence = dealSequence(game);
     clearTimeout(this.timer);
     const effect = document.createElement('div');
     effect.className = 'deal-effect';
     effect.dataset.effect = 'deal';
+    effect.style.setProperty('--intro', `${DEAL.intro}ms`);
+    effect.style.setProperty('--roll', `${DEAL.roll}ms`);
+    effect.style.setProperty('--dice-duration', `${sequence.diceDuration + DEAL.assemble}ms`);
+    effect.style.setProperty('--tiles-at', `${sequence.tilesAt}ms`);
     effect.setAttribute('role', 'status');
     effect.setAttribute('aria-label', `Hand ${hand}. Shuffling and dealing tiles.`);
-    effect.innerHTML = `<div class="deal-halo" aria-hidden="true"></div><div class="deal-winds" aria-hidden="true"><i>東</i><i>南</i><i>西</i><i>北</i></div><div class="deal-caption"><small>HAND ${hand}</small><strong>THE WINDS GATHER</strong><span class="shuffle-label">SHUFFLE</span><span class="deal-label">DEAL · EAST BEGINS</span></div>`;
-    if (game.setup) {
+    effect.innerHTML = `<div class="deal-intro"><div class="deal-halo" aria-hidden="true"></div><div class="deal-winds" aria-hidden="true"><i>東</i><i>南</i><i>西</i><i>北</i></div><div class="deal-caption"><small>HAND ${hand}</small><strong>THE WINDS GATHER</strong><span class="shuffle-label">SHUFFLE</span></div></div><div class="deal-finish-caption">DEAL · EAST BEGINS</div>`;
+    if (game.setup && sequence.rolls) {
       const dice = document.createElement('div');
       dice.className = 'setup-dice';
       const glyphs = ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
@@ -38,7 +43,10 @@ export class TableEffects {
       effect.append(dice);
     }
     this.host.replaceChildren(effect);
-    this.timer = setTimeout(() => this.host.replaceChildren(), DEAL.duration);
+    this.timer = setTimeout(
+      () => this.host.replaceChildren(),
+      matchMedia('(prefers-reduced-motion: reduce)').matches ? DEAL.intro : sequence.duration,
+    );
   }
   play(id: string, kind: string, player: string, detail: string) {
     if (id === this.seen) return;

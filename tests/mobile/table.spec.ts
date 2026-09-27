@@ -1,3 +1,4 @@
+import { preserveTableFrames, tableFrame } from '../fixtures/table-view';
 import { expect } from '@playwright/test';
 import { applyAction } from '../../server/engine';
 import { test, setup, order, inViewport } from '../fixtures/table';
@@ -135,7 +136,7 @@ test('touch starts a table with a shuffle and deal without hiding the rack or ac
   await page.locator('.hand-tiles .tile').first().tap();
   await expect(page.locator('.discard-button')).toBeEnabled();
   await expect(page.getByRole('tooltip')).toBeVisible();
-  await expect(page.locator('[data-effect="deal"]')).toHaveCount(0, { timeout: 4000 });
+  await expect(page.locator('[data-effect="deal"]')).toHaveCount(0, { timeout: 6000 });
 });
 
 test('local day theme keeps touch claims and the rack usable in portrait and landscape', async ({
@@ -175,4 +176,51 @@ test('local day theme keeps touch claims and the rack usable in portrait and lan
   await expect(page.locator('.discard-button')).toBeEnabled();
   await page.reload();
   await expect(page.locator('#live-table')).toHaveAttribute('data-theme', 'porcelain-day');
+});
+
+test('touch zoom controls and the background lotus work without changing the hand', async ({
+  page,
+  tableServer,
+}, testInfo) => {
+  await preserveTableFrames(page);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const g = await setup(page, tableServer, 'complete');
+  const before = JSON.stringify(g);
+  const original = await tableFrame(page);
+  await page.getByRole('button', { name: 'Table settings', exact: true }).tap();
+  await page.getByLabel('Scroll or pinch to zoom').check();
+  await page.getByRole('button', { name: 'Zoom in', exact: true }).tap();
+  await page.getByRole('button', { name: 'Close dialog' }).tap();
+  expect(await tableFrame(page)).not.toBe(original);
+  if (testInfo.project.name === 'Android Chrome') {
+    const cdp = await page.context().newCDPSession(page);
+    const rect = (await page.locator('#live-table canvas').boundingBox())!;
+    const x = rect.x + rect.width / 2,
+      y = rect.y + rect.height / 3;
+    const beforePinch = await tableFrame(page);
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: [
+        { x: x - 20, y, id: 0 },
+        { x: x + 20, y, id: 1 },
+      ],
+    });
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchMove',
+      touchPoints: [
+        { x: x - 60, y, id: 0 },
+        { x: x + 60, y, id: 1 },
+      ],
+    });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    expect(await tableFrame(page)).not.toBe(beforePinch);
+    await cdp.detach();
+  }
+  await page.getByRole('button', { name: 'Touch the lotus to make it bloom' }).tap();
+  await expect(page.locator('.zen-garden')).toHaveClass(/blooming/);
+  await page.getByRole('button', { name: 'Table settings', exact: true }).tap();
+  await page.getByRole('button', { name: 'Reset board view' }).tap();
+  await page.getByRole('button', { name: 'Close dialog' }).tap();
+  expect(await tableFrame(page)).toBe(original);
+  expect(JSON.stringify(g)).toBe(before);
 });

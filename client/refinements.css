@@ -1139,7 +1139,13 @@ legend,
   display: grid;
   place-items: center;
   pointer-events: none;
-  animation: deal-exit 2.3s both;
+}
+.deal-intro {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  animation: opening-intro var(--intro) both;
 }
 .deal-halo {
   position: absolute;
@@ -1151,7 +1157,7 @@ legend,
     0 0 65px #dbaa4340,
     inset 0 0 45px #dbaa4330;
   background: repeating-conic-gradient(from 0deg, #fce4ac33 0deg 1deg, transparent 1deg 30deg);
-  animation: deal-halo 2.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: deal-halo var(--intro) cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 .deal-winds {
   position: absolute;
@@ -1200,11 +1206,14 @@ legend,
   font-size: 10px;
   letter-spacing: 0.2em;
 }
-.shuffle-label {
-  animation: shuffle-label 0.9s steps(1) both;
-}
-.deal-label {
-  animation: deal-label 0.9s steps(1) both;
+.deal-finish-caption {
+  color: #fff3d0;
+  text-shadow: 0 2px 12px #051b15;
+  background: linear-gradient(90deg, transparent, #102d26ee 22% 78%, transparent);
+  padding: 18px 40px;
+  font-size: 14px;
+  letter-spacing: 0.18em;
+  animation: deal-label 1ms var(--tiles-at) steps(1) both;
 }
 @keyframes deal-halo {
   from {
@@ -1229,7 +1238,7 @@ legend,
     transform: none;
   }
 }
-@keyframes deal-exit {
+@keyframes opening-intro {
   0% {
     opacity: 0;
   }
@@ -1239,13 +1248,6 @@ legend,
   }
   100% {
     opacity: 0;
-  }
-}
-@keyframes shuffle-label {
-  from {
-    visibility: visible;
-  }
-  to {
     visibility: hidden;
   }
 }
@@ -1259,15 +1261,20 @@ legend,
 }
 @media (prefers-reduced-motion: reduce) {
   .deal-effect,
+  .deal-intro,
   .deal-winds i,
-  .shuffle-label,
-  .deal-label {
+  .deal-finish-caption {
     animation: none;
   }
+  .deal-intro,
   .deal-halo,
   .deal-winds,
   .shuffle-label {
     display: none;
+  }
+  .deal-effect:has(.setup-dice) .deal-finish-caption {
+    align-self: end;
+    margin-bottom: 15px;
   }
 }
 

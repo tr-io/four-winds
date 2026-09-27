@@ -8,6 +8,7 @@
     "build": "tsc --noEmit && vite build",
     "start": "tsx server/index.ts",
     "test": "vitest run",
+    "test:load": "node --import tsx tests/load/capacity.ts",
     "test:watch": "vitest",
     "check": "tsc --noEmit",
     "postinstall": "patch-package",

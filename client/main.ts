@@ -1,3 +1,4 @@
+import { HandAnalyzer } from './hand-analysis';
 import { SocialUI, eventLogHTML, gardenHTML } from './social';
 import { avatarImage, avatarAttribution } from './avatars';
 import { AVATAR_CHOICES, avatarChoice } from '../shared/avatars';
@@ -23,7 +24,7 @@ import {
   type TableTheme,
 } from './table-theme';
 import { io } from 'socket.io-client';
-import type { AppState, GameView, HandAnalysis, Preset, RoomSummary, Rules } from '../shared/types';
+import type { AppState, GameView, Preset, RoomSummary, Rules } from '../shared/types';
 import { PRESETS, PRESET_DETAILS, rulesSchema } from '../shared/rules';
 import { WINDS, WIND_SYMBOLS, tileName } from '../shared/tiles';
 import { MahjongTable } from './table';
@@ -31,7 +32,7 @@ import { tileStatic } from './tile-art';
 import { HandRack } from './hand-rack';
 import { summarizeDiscards } from './discards';
 import { TableEffects } from './table-effects';
-import { freshDealKey } from './deal-sequence';
+import { freshDealKey, dealSequence } from './deal-sequence';
 import { installTileTooltips, hideTileTooltip } from './tile-tooltip';
 import { GameAudio, type SoundCue } from './game-audio';
 import { handInsight } from './hand-insight';
@@ -195,6 +196,12 @@ socket.on('connect_error', () => {
   connected = false;
   connectionUI();
 });
+socket.on('rooms-changed', (rooms: RoomSummary[]) => {
+  if (!state) return;
+  const updates = new Map(rooms.map((r) => [r.code, r]));
+  state.rooms = state.rooms.map((r) => updates.get(r.code) ?? r);
+  if (!state.room && page === 'play') render();
+});
 socket.on('state', (next: AppState) => {
   offset = next.serverTime - Date.now();
   const wasLive =
@@ -218,7 +225,7 @@ socket.on('state', (next: AppState) => {
       sessionStorage.setItem('four-winds-last-deal', dealKey);
       table?.deal(g);
       effects?.deal(g);
-      tone('start');
+      gameAudio.play('start', dealSequence(g));
     }
     if (!g.result && activeDialog === 'result') closeDialog();
     const eventKey = `${state.room!.code}:${g.handNumber}`;
@@ -496,6 +503,7 @@ function handDetailHTML(g: GameView) {
   return `<div class="hand-overview"><div class="hand-route"><span>${insight.closed ? '門 CLOSED' : '副 OPEN'}</span><h3>${insight.route}</h3></div><div class="set-slots" aria-label="${insight.locked} declared melds of four">${Array.from({ length: 4 }, (_, i) => `<span class="${i < insight.locked ? 'filled' : ''}">${i < insight.locked ? { pung: '碰', chow: '吃', kong: '槓' }[me.melds[i].kind] : '—'}<small>${i < insight.locked ? me.melds[i].kind : 'set'}</small></span>`).join('')}<span class="pair-slot">対<small>pair</small></span></div><p class="field-help">Declared sets are filled. Complete concealed sets and special hands are checked when you win.</p><div class="detail-rack">${me.hand.map((t) => tileStatic(t)).join('')}</div><div class="detail-melds">${meldsHTML(g)}</div><div class="suit-bars">${['Characters 萬', 'Circles 筒', 'Bamboo 索', 'Honors 字'].map((label, i) => `<div><span>${label}</span><i style="--fill:${(insight.suits[i] / max) * 100}%"></i><b>${insight.suits[i]}</b></div>`).join('')}</div>${insight.pairs.length ? `<div class="pair-candidates"><span>Pair candidates</span>${insight.pairs.map((t) => tileStatic(t, 'mini')).join('')}</div>` : ''}<p class="field-help">Tile composition, not a scoring prediction. Candidate pairs may also form chows or pungs.</p></div>`;
 }
 let handTab = 'overview';
+const handAnalyzer = new HandAnalyzer();
 let analysisKey = '';
 let analysisPending = false;
 function selectHandTab(tab: string) {
@@ -518,19 +526,21 @@ async function requestHandAnalysis() {
     '<p class="analysis-loading" role="status">Reading the hand…</p>',
   );
   try {
-    const result = await command('analyze-hand');
+    const analysis = await handAnalyzer.analyze(g);
     if (
       activeDialog === 'hand-detail' &&
       key === `${state?.room?.code}:${state?.room?.game?.handNumber}:${state?.room?.game?.decision}`
     ) {
       analysisKey = key;
-      setHTML('#hand-winning-routes', winningRoutesHTML(result.analysis as HandAnalysis));
+      setHTML('#hand-winning-routes', winningRoutesHTML(analysis));
     }
-  } catch {
-    setHTML(
-      '#hand-winning-routes',
-      '<button class="button outline" data-do="retry-analysis">Retry hand analysis</button>',
-    );
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') return;
+    if (activeDialog === 'hand-detail')
+      setHTML(
+        '#hand-winning-routes',
+        '<p role="status">Hand analysis is unavailable right now. You can keep playing.</p><button class="button outline" data-do="retry-analysis">Retry hand analysis</button>',
+      );
   } finally {
     analysisPending = false;
     if (
@@ -792,6 +802,7 @@ function updateClocks() {
 setInterval(updateClocks, 150);
 
 function openDialog(name: string, title: string, body: string, wide = false) {
+  if (name !== 'hand-detail') handAnalyzer.cancel();
   hideTileTooltip();
   activeDialog = name;
   modal.className = wide ? 'wide-dialog' : '';
@@ -799,10 +810,12 @@ function openDialog(name: string, title: string, body: string, wide = false) {
   if (!modal.open) modal.showModal();
 }
 function closeDialog() {
+  handAnalyzer.cancel();
   hideTileTooltip();
   modal.close();
   activeDialog = '';
 }
+modal.addEventListener('cancel', () => closeDialog());
 modal.addEventListener('click', (e) => {
   if (e.target === modal) {
     const r = modal.getBoundingClientRect();

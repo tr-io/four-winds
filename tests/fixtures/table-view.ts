@@ -15,3 +15,30 @@ export async function tableProjection(page: Page) {
     return { x: rect.x + ((v.x + 1) / 2) * rect.width, y: rect.y + ((1 - v.y) / 2) * rect.height };
   };
 }
+
+/** Keep the WebGL pixels available so camera tests compare the board without DOM clocks/overlays. */
+export async function preserveTableFrames(page: Page) {
+  await page.addInitScript(() => {
+    const original = HTMLCanvasElement.prototype.getContext as (
+      type: string,
+      options?: unknown,
+    ) => RenderingContext | null;
+    HTMLCanvasElement.prototype.getContext = function (
+      this: HTMLCanvasElement,
+      type: string,
+      options?: WebGLContextAttributes,
+    ) {
+      return original.call(
+        this,
+        type,
+        type === 'webgl2' ? { ...options, preserveDrawingBuffer: true } : options,
+      );
+    } as typeof HTMLCanvasElement.prototype.getContext;
+  });
+}
+export async function tableFrame(page: Page) {
+  await page.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  );
+  return page.locator('#live-table canvas').evaluate((el) => (el as HTMLCanvasElement).toDataURL());
+}

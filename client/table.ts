@@ -7,7 +7,7 @@ import type { GameView } from '../shared/types';
 import { drawTileFace } from './tile-art';
 import { kind, tileName } from '../shared/tiles';
 import { hideTileTooltip, showTileTooltip } from './tile-tooltip';
-import { DEAL } from './deal-sequence';
+import { DEAL, dealSequence } from './deal-sequence';
 import { TABLE_THEMES, type TableTheme } from './table-theme';
 import { tableFieldOfView } from './table-camera';
 type Piece = {
@@ -89,6 +89,9 @@ export class MahjongTable {
     this.controls.enabled = false;
     this.controls.enablePan = true;
     this.controls.enableZoom = false;
+    this.controls.minDistance = 12;
+    this.controls.maxDistance = 26;
+    this.controls.zoomSpeed = 0.65;
     this.controls.minPolarAngle = Math.PI / 7;
     this.controls.maxPolarAngle = Math.PI / 2.7;
     this.controls.addEventListener('change', () => {
@@ -118,11 +121,29 @@ export class MahjongTable {
     this.motionPreference.addEventListener('change', this.wake);
     this.wake();
   }
-  setRotation(enabled: boolean) {
+  setViewControls(rotate: boolean, zoom: boolean) {
     if (this.preview) return;
-    this.controls.enabled = enabled && !this.preview;
+    const enabled = rotate || zoom;
+    this.controls.enabled = enabled;
+    this.controls.enableRotate = rotate;
+    this.controls.enablePan = rotate;
+    this.controls.enableZoom = zoom;
     this.renderer.domElement.style.touchAction = enabled ? 'none' : 'auto';
     if (!enabled) this.resetView();
+    this.wake();
+  }
+  zoomBy(factor: number) {
+    if (!this.controls.enabled || !this.controls.enableZoom) return;
+    const offset = this.camera.position.clone().sub(this.controls.target);
+    offset.setLength(
+      THREE.MathUtils.clamp(
+        offset.length() * factor,
+        this.controls.minDistance,
+        this.controls.maxDistance,
+      ),
+    );
+    this.camera.position.copy(this.controls.target).add(offset);
+    this.controls.update();
     this.wake();
   }
   resetView() {
@@ -394,8 +415,9 @@ export class MahjongTable {
   deal(game: GameView) {
     if (this.reduced || !game.setup) return;
     const now = performance.now(),
-      setup = game.setup;
-    this.openingUntil = now + DEAL.duration;
+      setup = game.setup,
+      sequence = dealSequence(game);
+    this.openingUntil = now + sequence.duration;
     // Rebuild consumed initial slots; each packet leaves the actual broken wall in order.
     setup.deal.forEach((step, index) => {
       const pt = wallPosition(step.slot, setup.total, game.seat);
@@ -408,7 +430,7 @@ export class MahjongTable {
       const target = seatPoint(((index % 14) - 6.5) * 0.32, 5.46, (step.seat - game.seat + 4) % 4);
       p.target.set(target.x, 0.095, target.z);
       p.rotation = target.r;
-      p.born = now + DEAL.shuffle + DEAL.assemble + Math.floor(index / 4) * DEAL.packet;
+      p.born = now + sequence.tilesAt + Math.floor(index / 4) * DEAL.packet;
       p.deal = { index: -1, duration: DEAL.flight };
       p.lift = 1;
       p.removeAt = p.born + DEAL.flight;

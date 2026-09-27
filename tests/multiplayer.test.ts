@@ -392,3 +392,42 @@ describe('social play and saved profiles', () => {
     expect(JSON.stringify(g)).toBe(before);
   });
 });
+
+it('sends private game snapshots only to the affected table and small summaries to others', async () => {
+  const a = await client(),
+    b = await client(),
+    outsider = await client();
+  await a.command('create', { name: 'First', rules: PRESETS.mcr, bots: false });
+  await b.command('join', a.state.room!.code);
+  await a.command('fill-bots');
+  await outsider.command('create', { name: 'Second', rules: PRESETS.mcr, bots: false });
+  await flush();
+  let unrelated = 0,
+    teammate = 0;
+  const summaries: unknown[] = [];
+  outsider.socket.on('state', () => unrelated++);
+  outsider.socket.on('rooms-changed', (rooms) => summaries.push(...rooms));
+  b.socket.on('state', () => teammate++);
+  expect((await a.command('start')).ok).toBe(true);
+  await flush();
+  expect(teammate).toBe(1);
+  expect(unrelated).toBe(0);
+  expect(summaries).toHaveLength(1);
+  expect(summaries[0]).toMatchObject({
+    code: a.state.room!.code,
+    phase: a.state.room!.game!.phase,
+  });
+  expect(summaries[0]).not.toHaveProperty('game');
+  expect(summaries[0]).not.toHaveProperty('players');
+  const g = a.state.room!.game!;
+  expect(
+    (await a.command('action', { decision: g.decision, action: `discard:${g.players[0].hand[0]}` }))
+      .ok,
+  ).toBe(true);
+  await flush();
+  expect(teammate).toBe(2);
+  await a.command('action', { decision: -1, action: 'discard:0' });
+  await a.command('analyze-hand');
+  await flush();
+  expect(unrelated).toBe(0);
+});
