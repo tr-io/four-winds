@@ -5,17 +5,16 @@ before relying on the snapshot. Start with the user's latest request.
 
 ## Resume here
 
-1. Current bug fixes are on **`fix/table-visibility-and-zoom`**, stacked on
-   `feat/social-table-experience` ([PR #2](https://github.com/tr-io/four-winds/pull/2), still open;
-   its CI passed). The top opponent hand was rendered but covered by its player card. Short
+1. Continue on **`feat/social-table-experience`**, [PR #2](https://github.com/tr-io/four-winds/pull/2).
+   The user explicitly requested staying on this feature branch. [PR #3](https://github.com/tr-io/four-winds/pull/3)
+   was merged into it as `f8859c3`; PR #2 remains open and main is unchanged. The top opponent hand was rendered but covered by its player card. Short
    viewports also overlapped seat cards with recent actions and clipped the discard ledger.
    `client/table-viewport.css` now reserves room around the canvas, and `table-camera.ts` fits
    the whole table to that space. Short windows scroll internally. The ledger opens above its
    bottom-right button, keeps tile faces from shrinking, and scrolls into view when pinned or
    focused. Tile tooltips follow focused/hovered tiles during scroll. All opponent faces remain
    concealed; the local hand remains in the HTML rack. Nine new regressions cover live viewport
-   resizing, seat/hand occlusion, ledger clipping, action access, and focused tooltips. Review the
-   fix against the feature branch so its PR contains only these corrections. Keep main unchanged.
+   resizing, seat/hand occlusion, ledger clipping, action access, and focused tooltips.
 2. **How to play** is now an interactive page with preset switching, tile explanations, a moving
    turn walkthrough, hand grouping/checking, and competing-claim examples. `server/lessons.ts`
    validates separate preset examples through the existing engine in isolated games; scoring,
@@ -41,11 +40,23 @@ before relying on the snapshot. Start with the user's latest request.
    The local review server at **localhost:3102** was last started with
    `/tmp/four-winds-feature-review.json`; check availability before using it.
 
+6. The npm audit warning was DiceBear Core <=9.4.2 ([advisory](https://github.com/advisories/GHSA-gcr2-9v8m-gq45)).
+   Core and the three bundled styles are now 9.4.3. Fresh `npm ci` applies both scoring patches;
+   `npm audit` reports zero vulnerabilities. PR #3’s CI failed only during fixture shutdown.
+   A partial HTTP request reproduced the hang on Node 24; `tests/fixtures/http-server.ts` now
+   tracks and terminates test connections when closing. The regression fails with the old
+   cleanup and passes with the fix. This affects test servers only. On Node 24.21.0, all **93 unit**,
+   **37 desktop**, and **12 mobile** tests pass, as do build/types, formatting, and five deployment
+   tests. The dependency and fixture fixes are committed on the feature branch; check the latest
+   PR #2 CI run for remote verification.
+
 ## User preferences and decisions
 
 - Follow the branch → commit → push → PR workflow in [AGENTS.md](AGENTS.md), requested on
   27 September 2026. This supersedes the previous direct-to-main preference.
   Repository: `tr-io/four-winds`, remote `git@github.com:tr-io/four-winds.git`.
+- Continue this work on the existing feature branch per the user’s follow-up; do not create
+  another branch/PR for follow-up fixes to PR #2.
 - Work through authorized tasks without repeated confirmation. Explain actual blockers clearly.
 - The table, rack, claim prompts, settings, and help belong inside the game window. Keep actions
   visible on desktop and mobile. The user prefers a mahjong-themed game UI, clear visual state,

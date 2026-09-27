@@ -1,8 +1,7 @@
 import { test as base, expect, type Page } from '@playwright/test';
 import express from 'express';
-import { createServer } from 'node:http';
 import { resolve } from 'node:path';
-import { Server } from 'socket.io';
+import { createTestServer } from './http-server';
 import { GameService } from '../../server/service';
 import { applyAction, gameView, newPlayer, startGame } from '../../server/engine';
 import { PRESETS } from '../../shared/rules';
@@ -14,8 +13,7 @@ export const test = base.extend<{ tableServer: { service: GameService; url: stri
     // Real production client + authoritative service; fixtures never enter the public app.
     const app = express();
     app.use(express.static(resolve('dist')));
-    const http = createServer(app);
-    const io = new Server(http);
+    const { http, io, close } = createTestServer(app);
     const service = new GameService(io, null);
     await new Promise<void>((r) => http.listen(0, '127.0.0.1', r));
     const url = `http://127.0.0.1:${(http.address() as { port: number }).port}`;
@@ -23,7 +21,7 @@ export const test = base.extend<{ tableServer: { service: GameService; url: stri
       await use({ service, url });
     } finally {
       service.close();
-      await new Promise<void>((r) => io.close(() => r()));
+      await close();
     }
   },
 });
