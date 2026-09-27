@@ -6,7 +6,9 @@ before relying on the snapshot. Start with the user's latest request.
 ## Resume here
 
 1. Current work is **`fix/analysis-latency-and-server-capacity`**, based on updated `main`
-   at `66eb04f` after [PR #5](https://github.com/tr-io/four-winds/pull/5) merged. The user reported
+   at `66eb04f` after [PR #5](https://github.com/tr-io/four-winds/pull/5) merged. Changes are committed
+   and pushed to [PR #6](https://github.com/tr-io/four-winds/pull/6); check its state before follow-ups.
+   The user reported
    Winning routes stalling the server and requested a 50–100-game / 400-player architecture audit
    with diagrams. The branch moves suggestions to a cancellable **browser Web Worker** using
    the existing scorer and the player's visible snapshot. Legacy `analyze-hand` commands return
