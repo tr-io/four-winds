@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 500" fill="none">
+  <defs>
+    <linearGradient id="leaf" x2="1" y2="1"><stop stop-color="#5c936a"/><stop offset="1" stop-color="#143d30"/></linearGradient>
+    <linearGradient id="lamp" x2="1" y2="1"><stop stop-color="#ffe0a6"/><stop offset="1" stop-color="#eb8052"/></linearGradient>
+    <radialGradient id="glow"><stop stop-color="#faac65" stop-opacity=".25"/><stop offset="1" stop-color="#faac65" stop-opacity="0"/></radialGradient>
+    <path id="sprig" d="M0 0Q-56-45-35-120Q15-99 0 0M0 0Q22-66 89-74Q81-12 0 0" fill="url(#leaf)"/>
+  </defs>
+  <circle cx="968" cy="112" r="200" fill="url(#glow)"/>
+  <g stroke="#80bca4" stroke-opacity=".13">
+    <path d="M460 348Q720 169 1190 325M438 362Q740 190 1210 343M417 376Q760 211 1230 361"/>
+    <circle cx="832" cy="247" r="201"/><circle cx="832" cy="247" r="189" stroke-dasharray="2 16"/>
+    <path d="m832 62 20 155 165 30-165 23-20 162-24-161-162-24 162-28Z"/>
+  </g>
+  <g opacity=".75">
+    <path d="M1120 500Q1050 253 1196 102M25 500Q152 309 37 131" stroke="#668763" stroke-width="5"/>
+    <use href="#sprig" transform="translate(1106 412) rotate(22)"/>
+    <use href="#sprig" transform="translate(1114 293) rotate(41) scale(.8)"/>
+    <use href="#sprig" transform="translate(1148 204) rotate(64) scale(.7)"/>
+    <use href="#sprig" transform="translate(67 426) rotate(-40) scale(.8)"/>
+    <use href="#sprig" transform="translate(88 322) rotate(-54) scale(.7)"/>
+  </g>
+  <path d="M975 0V52" stroke="#aa8256" stroke-width="3"/>
+  <path d="m943 63 32-13 32 13v76l-32 14-32-14Z" fill="url(#lamp)" stroke="#704831" stroke-width="3"/>
+  <path d="M975 52v99m-20-92v84m40-84v84" stroke="#824b2c" stroke-opacity=".3"/>
+  <path d="m975 78 7 18 18 7-18 7-7 19-7-19-18-7 18-7Z" stroke="#523e2c" stroke-width="2"/>
+  <path d="M975 153v19m-4-4h8" stroke="#e29d65" stroke-width="3"/>
+  <g fill="#ffad76"><circle cx="754" cy="93" r="2"/><circle cx="632" cy="195" r="2"/><circle cx="1040" cy="225" r="2"/><path d="m1160 408 4 7 8 2-8 3-4 8-3-8-8-3 8-2Z"/></g>
+</svg>

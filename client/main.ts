@@ -8,6 +8,14 @@ import '@fontsource/cormorant-garamond/latin-600.css';
 import './style.css';
 import './game.css';
 import './refinements.css';
+import './themes.css';
+import {
+  TABLE_THEMES,
+  isTableTheme,
+  readTableTheme,
+  saveTableTheme,
+  type TableTheme,
+} from './table-theme';
 import { io } from 'socket.io-client';
 import type { AppState, GameView, HandAnalysis, Preset, RoomSummary, Rules } from '../shared/types';
 import { PRESETS, PRESET_DETAILS, rulesSchema } from '../shared/rules';
@@ -61,6 +69,23 @@ const icons: Record<string, string> = {
 const icon = (name: string, cls = '') =>
   `<svg class="icon ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name] ?? icons.leaf}</svg>`;
 const mark = `<svg class="wind-mark" viewBox="0 0 40 40" aria-hidden="true"><path d="m20 1 6 13 13 6-13 6-6 13-6-13L1 20l13-6Z" fill="currentColor"/><path d="m20 11 3 6 6 3-6 3-3 6-3-6-6-3 6-3Z" fill="var(--paper)"/></svg>`;
+let theme: TableTheme = 'jade-night';
+let themePlayer = '';
+function applyTheme(next: TableTheme) {
+  theme = next;
+  document.body.dataset.tableTheme = next;
+  if (state?.room) table?.setTheme(next);
+}
+function themeSettingsHTML() {
+  return `<section class="theme-settings" aria-label="Your table appearance"><h3>Your table, your atmosphere.</h3><p>Only your view · saved for your player in this browser</p><div class="theme-options">${Object.entries(
+    TABLE_THEMES,
+  )
+    .map(
+      ([id, t]) =>
+        `<button type="button" class="theme-option" data-theme-choice="${id}" aria-pressed="${theme === id}"><span class="theme-swatch ${id}" aria-hidden="true">東 <i>✦</i> 南</span><strong>${t.name}</strong><small>${t.description}</small></button>`,
+    )
+    .join('')}</div><span class="sr-only" id="theme-announcement" role="status"></span></section>`;
+}
 let state: AppState | null = null,
   page: 'play' | 'rules' | 'learn' = 'play',
   table: MahjongTable | null = null,
@@ -164,6 +189,10 @@ socket.on('state', (next: AppState) => {
   const wasLive =
     state?.room?.code === next.room?.code && !!state?.room?.game && !state.room.game.result;
   state = next;
+  if (themePlayer !== next.profile.id) {
+    themePlayer = next.profile.id;
+    applyTheme(readTableTheme(themePlayer));
+  }
   const avatar = document.querySelector('#header-avatar')!;
   avatar.className = `avatar ${state.profile.avatar}`;
   avatar.textContent = state.profile.name.slice(0, 1);
@@ -245,7 +274,7 @@ function disposeTable() {
 }
 function mountScene(id: string, preview: boolean) {
   try {
-    table = new MahjongTable(document.getElementById(id)!, preview);
+    table = new MahjongTable(document.getElementById(id)!, preview, preview ? 'jade-night' : theme);
   } catch {
     document.getElementById(id)!.innerHTML =
       `<div class="canvas-fallback">${mark}<p>Your table is ready.</p><small>Use the tile controls below to play.</small></div>`;
@@ -408,8 +437,8 @@ function showTableSettings() {
   const changes = ruleChanges(r);
   openDialog(
     'table-settings',
-    'Table rules',
-    `<p class="settings-status">${state!.room!.game ? 'Locked for this match' : 'Configured by the table or lobby host'} · ${esc(PRESETS[r.preset].name)}</p>${ruleRibbon(r)}<div class="rule-readout">${activeRuleKeys(
+    'Table settings',
+    `${themeSettingsHTML()}<p class="settings-status">${state!.room!.game ? 'Locked for this match' : 'Configured by the table or lobby host'} · ${esc(PRESETS[r.preset].name)}</p>${ruleRibbon(r)}<div class="rule-readout">${activeRuleKeys(
       r,
     )
       .map(
@@ -556,7 +585,7 @@ function renderGame(g: GameView) {
       const relative = (i - g.seat + 4) % 4,
         active = playing && g.turn === i,
         newcomer = arrived.includes(p);
-      return `<div class="player-badge position-${relative} ${active ? 'current-player' : ''} ${newcomer ? 'player-arrival' : ''}" style="--arrival-delay:${relative * 110}ms">${avatarHTML(p.profile.name, p.profile.avatar, p.bot)}<div><strong>${esc(p.profile.name)} ${i === g.seat ? '<em>you</em>' : ''}</strong><small>${p.riichi ? '<b class="riichi-badge">RIICHI</b> ' : ''}${g.rules.points ? `${p.points.toLocaleString()} pts` : p.bot ? 'Bot' : p.connected ? 'Connected' : 'Reconnecting'}${g.rules.chips ? ` · ${p.chips.toLocaleString()} chips` : ''}</small></div><span class="seat-wind">${WIND_SYMBOLS[(i - g.dealer + 4) % 4]}</span>${active ? `<span class="seat-timer" data-countdown="${g.turnDeadline}"></span>` : ''}${!p.bot ? `<i class="seat-online ${p.connected ? '' : 'away'}"></i>` : ''}</div>`;
+      return `<div class="player-badge position-${relative} ${active ? 'current-player' : ''} ${newcomer ? 'player-arrival' : ''}" style="--arrival-delay:${relative * 110}ms">${avatarHTML(p.profile.name, p.profile.avatar, p.bot)}<div><strong title="${esc(p.profile.name)}">${esc(p.profile.name)} ${i === g.seat ? '<em>you</em>' : ''}</strong><small>${p.riichi ? '<b class="riichi-badge">RIICHI</b> ' : ''}${g.rules.points ? `${p.points.toLocaleString()} pts` : p.bot ? 'Bot' : p.connected ? 'Connected' : 'Reconnecting'}${g.rules.chips ? ` · ${p.chips.toLocaleString()} chips` : ''}</small></div><span class="seat-wind" aria-label="${WINDS[(i - g.dealer + 4) % 4]} seat">${WIND_SYMBOLS[(i - g.dealer + 4) % 4]}<small>${WINDS[(i - g.dealer + 4) % 4]}</small></span>${active ? `<span class="seat-turn">TURN</span><span class="seat-timer" data-countdown="${g.turnDeadline}"></span>` : ''}${!p.bot ? `<i class="seat-online ${p.connected ? '' : 'away'}"></i>` : ''}</div>`;
     })
     .join('');
   knownPlayers = new Set(g.players.map((p) => p.profile.id));
@@ -595,7 +624,7 @@ function renderGame(g: GameView) {
         : 'HAND COMPLETE';
   setHTML(
     '#hand-guidance',
-    `<span class="turn-label ${myTurn || (isClaim && g.actions.length) ? 'your-turn' : ''}">${guidance}</span>${assessment ? `<button class="score-hint ${blocked ? 'below-minimum' : 'qualified'}" data-do="win-check">${blocked ? 'Complete shape' : 'Hand qualifies'} · ${assessment.qualifying}/${assessment.minimum} fan ${icon('book')}</button>` : '<span class="rack-tip">Drag tiles to arrange</span>'}`,
+    `<span class="turn-label ${myTurn || (isClaim && g.actions.length) ? 'your-turn' : ''}">${guidance}</span>${assessment ? `<button class="score-hint ${blocked ? 'below-minimum' : 'qualified'}" data-do="win-check">${blocked ? 'Complete shape' : 'Hand qualifies'} · ${assessment.qualifying}/${assessment.minimum} fan ${icon('book')}</button>` : '<span class="rack-tip">Your hand · drag to arrange</span>'}`,
   );
   document.querySelector('#your-wind')!.textContent =
     `${WIND_SYMBOLS[(g.seat - g.dealer + 4) % 4]} ${WINDS[(g.seat - g.dealer + 4) % 4]}`;
@@ -619,7 +648,7 @@ function renderGame(g: GameView) {
   }
   setHTML(
     '#action-dock',
-    `<div class="action-bar ${isClaim ? 'claim-active' : ''}"><div class="action-context">${isClaim ? `${tileStatic(g.claim!.tile, 'claim-tile')}<div><strong>${g.claim?.submitted ? 'CALL LOCKED IN' : g.actions.length ? 'MAKE YOUR CALL' : 'CLAIM PENDING'}</strong><small>${esc(g.players[g.claim!.from].profile.name)} ${g.claim!.reason === 'discard' ? 'discarded' : 'declared a kong'} · <b data-countdown="${g.claim!.deadline}"></b></small></div>` : myTurn ? `<span class="turn-seal">打</span><div><strong>${blocked ? 'MORE FAN NEEDED' : g.actions.some((a) => a.kind === 'win') ? 'WINNING HAND' : 'CHOOSE YOUR DISCARD'}</strong><small>${blocked ? `${assessment!.qualifying} of ${assessment!.minimum} qualifying fan · flowers do not qualify` : 'Select a tile, then discard'} <b data-countdown="${g.turnDeadline}"></b></small></div>` : `<span class="turn-seal">${g.phase === 'ended' || g.phase === 'finished' ? '和' : '風'}</span><div><strong>${g.phase === 'ended' || g.phase === 'finished' ? 'HAND COMPLETE' : 'TABLE IN PLAY'}</strong><small>${isClaim ? 'Resolving calls' : 'Arrange your tiles while you wait'}</small></div>`}</div><div class="action-buttons">${specials.map((a) => `<button class="button ${a.kind === 'win' ? 'gold win-action' : 'primary'}" data-action="${a.id}">${a.tiles.length && a.kind !== 'win' ? a.tiles.map((t) => tileStatic(t, 'tiny')).join('') : a.kind === 'win' ? '<span class="action-glyph">和</span>' : ''}<span>${esc(a.label)}</span></button>`).join('')}${isClaim && g.actions.some((a) => a.kind === 'pass') ? '<button class="button outline" data-action="pass">Pass</button>' : ''}${g.actions.some((a) => a.kind === 'riichi') ? `<button class="button ${riichiMode ? 'primary' : 'outline'}" data-do="riichi">${riichiMode ? 'Cancel riichi' : 'Declare riichi'}</button>` : ''}${myTurn ? `<button class="button primary discard-button" data-do="discard" ${selected === null ? 'disabled' : ''}>${selected !== null ? `${riichiMode ? 'Riichi · ' : ''}Discard ${esc(tileName(selected))}` : 'Select a tile'} ${icon('arrow')}</button>` : g.phase === 'ended' ? '' : g.phase === 'finished' && state!.room!.host === state!.profile.id ? `<button class="button primary" data-do="rematch">Play another match ${icon('arrow')}</button>` : ''}</div>${isClaim ? `<div class="claim-time-bar"><i data-progress="${g.claim!.deadline}" data-duration="${g.rules.claimSeconds * 1000}"></i></div>` : ''}</div>`,
+    `<div class="action-bar ${isClaim ? 'claim-active' : ''}"><div class="action-context">${isClaim ? `${tileStatic(g.claim!.tile, 'claim-tile')}<div><strong>${g.claim?.submitted ? 'CALL LOCKED IN' : g.actions.length ? 'MAKE YOUR CALL' : 'CLAIM PENDING'}</strong><small>${esc(g.players[g.claim!.from].profile.name)} ${g.claim!.reason === 'discard' ? 'discarded' : 'declared a kong'} · <b data-countdown="${g.claim!.deadline}"></b></small></div>` : myTurn ? `<span class="turn-seal">打</span><div><strong>${blocked ? 'MORE FAN NEEDED' : g.actions.some((a) => a.kind === 'win') ? 'WINNING HAND' : 'CHOOSE YOUR DISCARD'}</strong><small>${blocked ? `${assessment!.qualifying} of ${assessment!.minimum} qualifying fan · flowers do not qualify` : 'Select a tile, then discard'} <b data-countdown="${g.turnDeadline}"></b></small></div>` : `<span class="turn-seal">${g.phase === 'ended' || g.phase === 'finished' ? '和' : '風'}</span><div><strong>${g.phase === 'ended' || g.phase === 'finished' ? 'HAND COMPLETE' : 'TABLE IN PLAY'}</strong><small>${isClaim ? 'Resolving calls' : 'Arrange your tiles while you wait'}</small></div>`}</div><div class="action-buttons">${specials.map((a) => `<button class="button ${a.kind === 'win' ? 'gold win-action' : 'primary'}" data-action="${a.id}">${a.tiles.length && a.kind !== 'win' ? a.tiles.map((t) => tileStatic(t, 'tiny')).join('') : a.kind === 'win' ? '<span class="action-glyph">和</span>' : ''}<span>${esc(a.kind === 'pung' ? (g.rules.preset === 'riichi' ? 'Pon / Pung' : 'Pung / Pong') : a.kind === 'chow' ? a.label.replace(/^(Chow|Chi)/, g.rules.preset === 'riichi' ? 'Chi / Chow' : 'Chow / Chi') : a.label)}</span></button>`).join('')}${isClaim && g.actions.some((a) => a.kind === 'pass') ? '<button class="button outline" data-action="pass">Pass</button>' : ''}${g.actions.some((a) => a.kind === 'riichi') ? `<button class="button ${riichiMode ? 'primary' : 'outline'}" data-do="riichi">${riichiMode ? 'Cancel riichi' : 'Declare riichi'}</button>` : ''}${myTurn ? `<button class="button primary discard-button" data-do="discard" ${selected === null ? 'disabled' : ''}>${selected !== null ? `${riichiMode ? 'Riichi · ' : ''}Discard ${esc(tileName(selected))}` : 'Select a tile'} ${icon('arrow')}</button>` : g.phase === 'ended' ? '' : g.phase === 'finished' && state!.room!.host === state!.profile.id ? `<button class="button primary" data-do="rematch">Play another match ${icon('arrow')}</button>` : ''}</div>${isClaim ? `<div class="claim-time-bar"><i data-progress="${g.claim!.deadline}" data-duration="${g.rules.claimSeconds * 1000}"></i></div>` : ''}</div>`,
   );
   setHTML('#round-transition', g.phase === 'ended' ? nextHandHTML(g) : '');
   if (activeDialog === 'result') setHTML('#next-hand-panel', nextHandHTML(g));
@@ -951,7 +980,12 @@ function renderEditor() {
   });
   selectRuleTab(editorTab);
   markRuleEdits();
-  modal.querySelector('.dialog-heading')!.insertAdjacentHTML('afterend', audioSettingsHTML());
+  modal
+    .querySelector('.dialog-heading')!
+    .insertAdjacentHTML(
+      'afterend',
+      `${editorContext === 'room' ? themeSettingsHTML() : ''}${audioSettingsHTML()}`,
+    );
 }
 function bonusRow(b: Rules['houseBonuses'][0], i: number) {
   return `<div class="bonus-row"><input name="bonusName${i}" placeholder="Bonus name" aria-label="Bonus name" value="${esc(b.name)}" maxlength="30" required/><select name="bonusCondition${i}" aria-label="Bonus condition">${['self-draw', 'closed', 'all-pungs', 'full-flush'].map((c) => `<option value="${c}" ${b.condition === c ? 'selected' : ''}>${c.replaceAll('-', ' ')}</option>`).join('')}</select><input name="bonusPoints${i}" type="number" min="1" max="100" value="${b.points}" aria-label="Bonus amount" required/><button type="button" class="icon-button" data-remove-bonus="${i}" aria-label="Remove bonus">${icon('close')}</button></div>`;
@@ -999,6 +1033,18 @@ app.addEventListener('click', async (e) => {
   const button = (e.target as Element).closest<HTMLElement>('button, [data-do]');
   if (!button || button.hasAttribute('disabled')) return;
   try {
+    if (isTableTheme(button.dataset.themeChoice) && state?.room) {
+      applyTheme(button.dataset.themeChoice);
+      const saved = saveTableTheme(state.profile.id, theme);
+      modal
+        .querySelectorAll<HTMLElement>('[data-theme-choice]')
+        .forEach((choice) =>
+          choice.setAttribute('aria-pressed', String(choice.dataset.themeChoice === theme)),
+        );
+      document.querySelector('#theme-announcement')!.textContent =
+        `${TABLE_THEMES[theme].name} applied. ${saved ? 'Preference saved.' : 'Storage unavailable; applies for this visit.'}`;
+      return;
+    }
     if (button.dataset.page) {
       if (state?.room) {
         showHelp();

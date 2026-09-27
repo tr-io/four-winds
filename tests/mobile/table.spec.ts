@@ -111,3 +111,42 @@ test('touch starts a table with a shuffle and deal without hiding the rack or ac
   await expect(page.getByRole('tooltip')).toBeVisible();
   await expect(page.locator('[data-effect="deal"]')).toHaveCount(0, { timeout: 4000 });
 });
+
+test('local day theme keeps touch claims and the rack usable in portrait and landscape', async ({
+  page,
+  tableServer,
+}, testInfo) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const g = await setup(page, tableServer, 'claim');
+  g.rules.chips = true;
+  tableServer.service.broadcast();
+  applyAction(g, 3, g.decision, 'discard:3');
+  tableServer.service.broadcast();
+  await page.getByRole('button', { name: 'Table settings', exact: true }).tap();
+  await page.getByRole('button', { name: /Porcelain Day/ }).tap();
+  await page.getByRole('button', { name: 'Close dialog' }).tap();
+  for (const viewport of [
+    { width: 390, height: 844 },
+    { width: 844, height: 390 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await inViewport(page, '.hand-tiles');
+    await inViewport(page, '#action-dock');
+    for (const id of ['pung', 'pass', 'win']) await inViewport(page, `[data-action="${id}"]`);
+    await page.screenshot({
+      path: `test-results/${testInfo.project.name}-porcelain-${viewport.width}.png`,
+    });
+    for (const badge of await page.locator('.player-badge').all())
+      await expect(badge).toContainText('chips');
+    expect(
+      await page
+        .locator('.action-buttons .button')
+        .evaluateAll((buttons) => buttons.every((b) => b.scrollWidth <= b.clientWidth + 1)),
+    ).toBe(true);
+  }
+  await page.locator('[data-action="pung"]').tap();
+  await page.locator('.hand-tiles .tile.playable').first().tap();
+  await expect(page.locator('.discard-button')).toBeEnabled();
+  await page.reload();
+  await expect(page.locator('#live-table')).toHaveAttribute('data-theme', 'porcelain-day');
+});

@@ -45,6 +45,36 @@ Use a recent Chrome, Firefox, Safari, or Edge. WebGL renders the table; the hand
 - **Game log and help:** use the clock and book buttons in the table toolbar. Both open inside the game view. On desktop, the diagonal-arrow button toggles fullscreen.
 - **Small screens:** try 390 × 844 portrait and 844 × 390 landscape. The rack uses two rows in portrait and moves beside the board in landscape. Claim buttons and discards should remain inside the viewport, including at browser zoom.
 
+### Local table themes
+
+Open **Table settings** (sliders in the game toolbar), then choose **Jade Night** or
+**Porcelain Day**. This works before dealing and during a match for every player. The choice
+applies immediately and persists for that player in this browser. Rules remain shared;
+appearance is local. Returning to the club always shows its dark forest palette.
+
+- **Normal turn:** select a rack tile, switch themes, and close settings. The same tile should
+  remain selected and Discard should still work. Reload to check the saved theme and hand order.
+  Your concealed hand appears once, in the interactive rack. Three.js shows opponents' backs,
+  public melds, bonuses, walls, and discards.
+- **Claim prompt:** wait for a legal discard, then check the offered tile, player, timer,
+  **Pung / Pong**, **Chow / Chi**, win, kong, and Pass buttons as applicable. Switching themes
+  must preserve the offered actions and deadline. The game clock continues while settings are
+  open. Use a 30-second claim window when checking manually.
+- **Multiple players:** choose Porcelain Day in one player's browser and leave another on
+  Jade Night. Each should keep their own appearance through a discard and reconnect.
+- **Motion:** repeat with the operating system's reduced-motion setting enabled. Selection
+  outlines and static claim/win feedback should remain visible without tile lifts or camera shakes.
+
+For repeatable turn/claim scenarios without waiting for a random deal, run
+`npm run test:e2e -- tests/browser/themes.spec.ts`. This uses an isolated in-memory server,
+executes real legal actions, and saves desktop/mobile screenshots under `test-results/`.
+Run `npm run test:mobile` separately for Android Chromium and iPhone WebKit coverage.
+
+Rendering notes: `client/main.ts` builds the landing page, lobby, player badges, and legal-action
+dock; `client/hand-rack.ts` owns rack input and local order; `client/table.ts` owns the Three.js
+scene. The former duplicate was a face-up 3D copy of the local concealed hand. The rack is now
+its sole main-game view; the explicit hand inspector and results still show hand details.
+
 For a short match, save a house ruleset with **1 wind**. This is four dealer rotations; dealer repeats can add hands. To speed testing, set 10-second turns and 3-second claims.
 
 ## 3. Four players on one computer

@@ -46,6 +46,11 @@ test('profile, saved rules, private lobby, four human seats, turn and reconnect'
     await expect(p.locator('#room-title')).toHaveText('Four browser friends');
     peers.push({ context, page: p });
   }
+  await page.getByRole('button', { name: 'Table settings', exact: true }).click();
+  await page.getByRole('button', { name: /Porcelain Day/ }).click();
+  await page.getByRole('button', { name: 'Close dialog' }).click();
+  for (const peer of peers)
+    await expect(peer.page.locator('#live-table')).toHaveAttribute('data-theme', 'jade-night');
   await page.getByRole('button', { name: 'Start the game', exact: true }).click();
   await expect(page.locator('.hand-tiles .tile')).toHaveCount(14);
   await expect(peers[0].page.locator('.hand-tiles .tile')).toHaveCount(13);

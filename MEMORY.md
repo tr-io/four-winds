@@ -5,20 +5,30 @@ before relying on the snapshot. Start with the user's latest request.
 
 ## Resume here
 
-1. Read `git status` and recent commits. The last code change is **`5da0447`**, pushed to `main`.
-   The working tree was clean before this documentation update.
-2. Check GitHub Actions for the latest commit. The full workflow for **`48bd23c` passed**;
-   the workflow for **`5da0447` was still running** when this handoff was written.
-3. Feature requests through the saved-table fix are implemented. No feature task is currently
-   unfinished. The production HTTPS health endpoint is responding, and the user's DigitalOcean
-   firewall attachment/rules and IPv4 TCP reachability were verified. Release workflow status,
-   production multiplayer play, and rollback have not been checked in this verification pass.
-4. Use the guides below for testing or deployment; keep saved games and browser identities intact.
+1. Read `git status` and recent commits. The UI refresh is on **`feat/local-table-themes`**.
+   Follow the branch/PR workflow in AGENTS.md; the user replaced the old direct-to-main workflow.
+2. The club now uses a forest/jade palette with original vector lantern and wind-garden artwork.
+   In-game **Table settings → Jade Night / Porcelain Day** changes local environment, felt,
+   table frame, lighting, and UI colors. `client/table-theme.ts` stores the choice under a player-ID
+   localStorage key; no theme enters server state or commands. The club always stays dark.
+3. The duplicate concealed hand came from Three.js plus the HTML rack. `client/table.ts` now
+   omits the local concealed row in live games. `HandRack` remains the sole playable hand;
+   opponents' backs, public melds, bonuses, and discards stay in Three.js. The explicit hand
+   inspector and results still show details. English seat labels and mobile claim layout improved.
+4. Gameplay, rulesets, scores, and multiplayer remain server-owned. Existing selection, draw,
+   discard, claim, win, audio, and reduced-motion effects are preserved. Read the local-theme
+   section in [TESTING.md](TESTING.md) for normal-turn and deterministic claim checks.
+5. Verification: 75 unit/network/UI tests, 22 desktop browser tests, 10 Android/iPhone cases,
+   five deployment tests, build/type, formatting, and release Compose validation pass. The two
+   new mobile theme cases were rerun after fixing landscape claim/rack overflow; all eight
+   existing mobile cases passed in the preceding run. Review captures are in `.cache/ui-review/`
+   (local, ignored). Production has not been changed.
 
 ## User preferences and decisions
 
-- Commit and push completed changes. The repository is `tr-io/four-winds`, remote
-  `git@github.com:tr-io/four-winds.git`; the current branch is `main`.
+- Follow the branch → commit → push → PR workflow in [AGENTS.md](AGENTS.md), requested on
+  27 September 2026. This supersedes the previous direct-to-main preference.
+  Repository: `tr-io/four-winds`, remote `git@github.com:tr-io/four-winds.git`.
 - Work through authorized tasks without repeated confirmation. Explain actual blockers clearly.
 - The table, rack, claim prompts, settings, and help belong inside the game window. Keep actions
   visible on desktop and mobile. The user prefers a mahjong-themed game UI, clear visual state,

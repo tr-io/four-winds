@@ -294,6 +294,11 @@ test('3D face inspection names visible tiles and never reveals a concealed tile'
   await expect(page.getByRole('tooltip')).toHaveText('Chrysanthemum');
   await page.mouse.click(visible.x, visible.y);
   await expect(page.getByRole('tooltip')).toHaveText('Chrysanthemum');
+  // The playable rack is the sole concealed hand; its old 3D row is empty.
+  const oldHand = point(-2, 4.9);
+  await page.mouse.move(oldHand.x, oldHand.y);
+  await expect(page.getByRole('tooltip')).toBeHidden();
+  await expect(page.locator('.hand-tiles .tile')).toHaveCount(game.players[0].hand.length);
   // Opposite hand, off-center to avoid its seat badge. The server has private tiles here.
   expect(game.players[2].hand.length).toBe(13);
   const hidden = point(2.82, -4.9);
