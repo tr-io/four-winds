@@ -3,7 +3,30 @@
 Updated **27 September 2026**. This records the last session; verify Git, CI, and running services
 before relying on the snapshot. Start with the user's latest request.
 
-## Resume here
+## Current work
+
+- **`feat/live-table-ux`**, based on `origin/main` at `40462eb` after PR #7 merged.
+  The user requested implementation of the live-table UX from two supplied layout references,
+  preserving actual game state and rules. Implementation and local verification are complete.
+- `client/main.ts` now groups Last Discard/Last Turn as expandable Recent activity (12 public
+  events), adds a labeled, explicitly toggled Discard ledger with counts and seat breakdowns,
+  separates read-only hand analysis from Inspect hand / Sort tiles, and puts the selected-tile
+  discard action below the rack with disabled-state guidance. Sort remains a one-click action.
+- `client/social.ts` retains the private queue and server action path, with a prominent toggle,
+  count, removal tray, explicit Done queueing instruction, and keyboard focus retention.
+  `client/live-table.css` handles responsive layout, theme variables, 44px controls, and states.
+  The single HandRack and Three.js scene remain the original game components.
+- Verification: **101 unit/network, 61 desktop, and 18 mobile tests pass**, plus 5 deployment
+  tests, build/types, formatting, avatar verification, diff checks, and release Compose validation.
+  Browser fixtures are isolated. Both themes and MCR/Riichi/Singapore are covered. Visuals in
+  `.cache/ui-review/live-table-ux/` are ignored artifacts. Small screens scroll to additional
+  controls and exposed tiles; six-column racks preserve 44px targets at 320px. Narrow toolbars
+  reserve their wrapped height. Compact seat cards wrap chip totals. The original lotus remains
+  usable and clear of seat presence indicators.
+- [Control guide](docs/live-table-interface.md) records current semantics and how to try each
+  control. Commit/push and PR creation are the final handoff step; production is unchanged.
+
+## Previous handoff
 
 1. Current work is **`fix/player-presence-and-browser-saves`**, based on `origin/main`
    at `2f8820b` after [PR #6](https://github.com/tr-io/four-winds/pull/6) merged. Changes are committed

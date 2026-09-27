@@ -67,19 +67,20 @@ test('MCR qualification explains the pictured hand; center ledger groups all dis
     'Flowers & seasons · added after qualification',
   );
   await page.getByRole('button', { name: 'Back to the hand', exact: true }).click();
-  await page.getByRole('button', { name: 'Show discarded tiles' }).hover();
+  await page.getByRole('button', { name: 'Discard ledger', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Discarded tiles' })).toBeVisible();
   await expect(page.locator('.discard-group[data-kind="3"] > strong')).toHaveText('4 / 4');
   await expect(page.locator('.discard-group[data-kind="30"] > strong')).toHaveText('2 / 4');
   await expect(page.locator('.discard-group[data-kind="27"] em')).toHaveText('1 called');
-  await page.mouse.move(5, 5);
+  await page.getByRole('button', { name: 'Close discard ledger' }).click();
   await expect(page.locator('#discard-ledger')).toBeHidden();
-  await page.getByRole('button', { name: 'Show discarded tiles' }).focus();
+  await page.getByRole('button', { name: 'Discard ledger', exact: true }).focus();
+  await page.keyboard.press('Enter');
   await expect(page.locator('#discard-ledger')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.locator('#discard-ledger')).toBeHidden();
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole('button', { name: 'Show discarded tiles' }).click();
+  await page.getByRole('button', { name: 'Discard ledger', exact: true }).click();
   await expect(page.locator('#discard-ledger')).toBeVisible();
   await inViewport(page, '#discard-ledger');
 });
@@ -223,11 +224,11 @@ test('English tile tooltips work in the rack, melds, bonuses, ledger, and hand i
   }
   await page.keyboard.press('Escape');
   await expect(page.getByRole('tooltip')).toBeHidden();
-  await page.getByRole('button', { name: 'Show discarded tiles' }).click();
+  await page.getByRole('button', { name: 'Discard ledger', exact: true }).click();
   const river = page.locator('.discard-group .tile').first();
   await river.hover();
   await expect(page.getByRole('tooltip')).toHaveText((await river.getAttribute('data-tile-name'))!);
-  await page.getByRole('button', { name: 'Close discarded tiles' }).click();
+  await page.getByRole('button', { name: 'Close discard ledger' }).click();
   await page.getByRole('button', { name: 'Inspect your hand' }).click();
   await expect(page.locator('.set-slots .filled')).toHaveCount(2);
   await expect(page.locator('.detail-melds .meld-pung .tile')).toHaveCount(3);
@@ -237,7 +238,9 @@ test('English tile tooltips work in the rack, melds, bonuses, ledger, and hand i
   await page.screenshot({ path: 'test-results/hand-inspector.png' });
   await page.getByRole('button', { name: 'Close dialog' }).click();
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator('#exposed-hand').scrollIntoViewIfNeeded();
   await inViewport(page, '#exposed-hand');
+  await page.locator('#action-dock').scrollIntoViewIfNeeded();
   await inViewport(page, '#action-dock');
   await page.screenshot({ path: 'test-results/mobile-melds.png' });
 });

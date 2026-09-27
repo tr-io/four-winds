@@ -17,6 +17,7 @@ import './refinements.css';
 import './themes.css';
 import './experience.css';
 import './table-viewport.css';
+import './live-table.css';
 import {
   TABLE_THEMES,
   isTableTheme,
@@ -51,6 +52,8 @@ const esc = (s: unknown) =>
     (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
   );
 const icons: Record<string, string> = {
+  stack: '<path d="m12 3 9 5-9 5-9-5 9-5ZM3 12l9 5 9-5M3 16l9 5 9-5"/>',
+  sort: '<path d="M8 4v16m-4-4 4 4 4-4M16 20V4m-4 4 4-4 4 4"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   arrow: '<path d="M5 12h14m-5-5 5 5-5 5"/>',
   diagonal: '<path d="M6 18 18 6M6 6h12v12"/>',
@@ -421,10 +424,10 @@ function savedLobbyRooms() {
 function roomShell() {
   return `<section class="game-window" aria-label="Mahjong game window">
     <header class="game-toolbar"><button class="icon-button" data-do="leave" aria-label="Leave table">${icon('back')}</button><div class="game-wordmark">四風 <span>FOUR WINDS</span></div><div class="table-title"><strong id="room-title"></strong><button id="room-rules" class="rule-pill" data-do="table-settings" aria-label="Table rules"></button></div><div class="game-tools"><button class="text-button" data-social="chat" aria-label="Open table chat">Chat</button><span class="game-connection" data-link-state>${connected ? 'LIVE' : 'RECONNECTING'}</span><button class="text-button room-code-button" data-do="share-room" aria-label="Copy table invitation">${icon('copy')} <span id="room-code"></span></button><button class="icon-button" data-do="table-settings" aria-label="Table settings">${icon('settings')}</button><button class="icon-button" data-do="log" aria-label="Game log" aria-expanded="false">${icon('clock')}</button><button class="icon-button" data-do="sound" aria-label="Toggle game sounds">${icon(sound ? 'sound' : 'mute')}</button><button class="icon-button" data-do="help" aria-label="Table help">${icon('book')}</button><button class="icon-button fullscreen-button" data-do="fullscreen" aria-label="Toggle fullscreen">${icon('diagonal')}</button></div></header>
-    <div class="board-area">${gardenHTML}<div class="game-table table-entrance"><div class="table-grain"></div><div class="game-meta" id="game-meta"></div><div id="live-table"></div><div id="seat-overlays"></div><div id="table-status"></div><div id="recent-actions" class="recent-actions" aria-label="Last table actions"></div><div id="table-effects" aria-live="polite"></div>
-      <div class="discard-inspector" id="discard-inspector"><button class="discard-trigger" data-do="discards" aria-label="Show discarded tiles" aria-expanded="false" aria-controls="discard-ledger" aria-pressed="false"><span>河</span><small>DISCARDS</small></button><section class="discard-ledger" id="discard-ledger" aria-label="Discarded tiles" hidden><header><div><strong>Discard ledger</strong><small>All seats · sorted by suit and rank</small></div><button class="icon-button" data-do="close-discards" aria-label="Close discarded tiles">${icon('close')}</button></header><div id="discard-groups"></div><p>Counts include called tiles. “Called” tiles are now in exposed melds.</p></section></div>
+    <div class="board-area">${gardenHTML}<div class="game-table table-entrance"><div class="table-grain"></div><div class="game-meta" id="game-meta"></div><div id="live-table"></div><div id="seat-overlays"></div><div id="table-status"></div><section id="recent-actions" class="recent-actions" aria-label="Recent activity"><button class="activity-trigger" data-do="activity" aria-expanded="false" aria-controls="recent-events">Recent activity ${icon('chevron')}</button><div id="activity-summary"></div><section id="recent-events" class="recent-events" aria-label="Recent events" hidden><header><strong>Recent events</strong><button class="icon-button" data-do="close-activity" aria-label="Close recent activity">${icon('close')}</button></header><div id="recent-event-list"></div></section></section><div id="table-effects" aria-live="polite"></div>
+      <div class="discard-inspector" id="discard-inspector"><button class="discard-trigger" data-do="discards" aria-label="Discard ledger" aria-expanded="false" aria-controls="discard-ledger" aria-pressed="false">${icon('stack')}<span>Discard ledger</span><span id="discard-count" class="tool-count">0</span>${icon('chevron')}</button><section class="discard-ledger" id="discard-ledger" aria-label="Discarded tiles" hidden><header><div><strong>Discards by tile</strong><small>All seats · sorted by suit and rank</small></div><button class="icon-button" data-do="close-discards" aria-label="Close discard ledger">${icon('close')}</button></header><div id="discard-groups"></div><p>Counts include called tiles. “Called” tiles are now in exposed melds.</p></section></div>
     </div><aside class="game-drawer" id="game-drawer" hidden><header><strong>TABLE RECORD</strong><button class="icon-button" data-do="log" aria-label="Close game log">${icon('close')}</button></header><div id="table-sidebar"></div><div id="log-entries" role="log" aria-label="Game log"></div></aside></div>
-    <section id="hand-area" class="game-dock" aria-label="Your hand and actions"><div id="waiting-controls"></div><div id="playing-controls"><div id="action-dock"></div><div id="round-transition"></div><div class="hand-header"><div id="hand-guidance"></div><div class="rack-tools"><button class="hand-insight-button" id="hand-shape" data-do="hand-detail" aria-label="Inspect your hand"></button><span class="your-wind" id="your-wind"></span><button class="text-button" data-do="sort" aria-label="Sort tiles by suit and rank">Sort tiles ${icon('chevron')}</button></div></div><p id="rack-instructions" class="sr-only">Drag to arrange your tiles. With a tile focused, use Alt and Left or Right to move it. Select a playable tile, then press Discard.</p><div class="hand-tiles" role="group" aria-label="Your concealed tiles"></div><div id="discard-queue" class="discard-queue"></div><div id="exposed-hand" class="exposed-hand"></div><span class="sr-only" id="rack-announcement" role="status"></span></div></section>
+    <section id="hand-area" class="game-dock" aria-label="Your hand and actions"><div id="waiting-controls"></div><div id="playing-controls"><div id="action-dock"></div><div id="round-transition"></div><div class="hand-header"><div id="hand-guidance"></div><div class="rack-tools"><div class="hand-analysis" role="group" aria-label="Hand analysis"><span class="analysis-label">Hand analysis</span><div id="hand-shape" class="hand-shape"></div><span class="your-wind" id="your-wind" title="Your seat wind"></span></div><div class="hand-controls" role="group" aria-label="Hand controls"><button class="button outline inspect-hand" data-do="hand-detail" aria-label="Inspect your hand">${icon('book')} Inspect hand</button><button class="button outline" data-do="sort" aria-label="Sort tiles by suit and rank">${icon('sort')} Sort tiles</button></div></div></div><p id="rack-instructions" class="sr-only">Drag to arrange your tiles. With a tile focused, use Alt and Left or Right to move it. Select a playable tile, then press Discard.</p><div class="hand-tiles" role="group" aria-label="Your concealed tiles"></div><div class="hand-footer"><div id="discard-queue" class="discard-queue"></div><div id="discard-action"></div></div><div id="exposed-hand" class="exposed-hand"></div><span class="sr-only" id="rack-announcement" role="status"></span></div></section>
   </section>`;
 }
 function renderRoom() {
@@ -443,7 +446,12 @@ function renderRoom() {
       document.querySelector('#rack-announcement')!.textContent = message;
     });
     effects = new TableEffects(document.querySelector('#table-effects')!);
-    bindDiscardInspector();
+    bindTableTools();
+    document
+      .querySelectorAll<HTMLButtonElement>('.game-toolbar button[aria-label]')
+      .forEach((button) => {
+        button.title = button.getAttribute('aria-label')!;
+      });
   }
   document.querySelector('#room-title')!.textContent = room.name;
   const changes = ruleChanges(room.rules);
@@ -615,8 +623,17 @@ function renderLastActions(g: GameView) {
   const discard = [...g.events].reverse().find((e) => e.type === 'discard');
   const action = [...g.events].reverse().find((e) => e.seat !== undefined && e.type !== 'info');
   setHTML(
-    '#recent-actions',
+    '#activity-summary',
     `<div class="last-action last-discard"><div><small>LAST DISCARD</small><strong>${discard ? esc(g.players[discard.seat!].profile.name) : 'Waiting for a discard'}</strong></div>${discard?.tile !== undefined ? tileStatic(discard.tile, 'mini') : '<span class="action-placeholder">打</span>'}</div><div class="last-action last-turn" role="status"><span class="action-symbol" aria-hidden="true">${action ? { draw: '摸', discard: '打', claim: '鳴', win: '和', bonus: '花', info: '風' }[action.type] : '風'}</span><div><small>LAST TURN</small><strong>${action ? esc(action.text) : 'Tiles dealt. East begins.'}</strong></div></div>`,
+  );
+  const trigger = document.querySelector<HTMLButtonElement>('.activity-trigger')!;
+  trigger.disabled = !g.events.length;
+  setHTML(
+    '#recent-event-list',
+    eventLogHTML(
+      [...g.events].reverse().slice(0, 12),
+      g.players.map((p) => p.profile.name),
+    ),
   );
 }
 
@@ -637,7 +654,7 @@ function renderWaiting() {
   document.querySelector<HTMLElement>('#playing-controls')!.hidden = true;
   document.querySelector<HTMLElement>('#waiting-controls')!.hidden = false;
   document.querySelector<HTMLElement>('#discard-inspector')!.hidden = true;
-  setHTML('#recent-actions', '');
+  document.querySelector<HTMLElement>('#recent-actions')!.hidden = true;
   document.querySelector('#waiting-controls')!.innerHTML =
     `<div class="waiting-rules">${ruleRibbon(room.rules)}<button class="text-button" data-do="table-settings">${icon('settings')} ${canConfigureTable() ? 'Configure table' : 'Table rules'}</button></div><div class="waiting-actions">${room.host === state!.profile.id ? `<button class="button outline" data-do="fill-bots" ${room.players.length === 4 ? 'disabled' : ''}>${icon('bot')} Fill seats with bots</button><button class="button primary" data-do="start" ${room.players.length < 4 ? 'disabled' : ''}>Start the game ${icon('arrow')}</button>` : `<span>Waiting for the host to start the hand.</span>`}<button class="text-button" data-do="share-room">${icon('copy')} Copy invitation</button></div>`;
   document.querySelector('#table-sidebar')!.innerHTML = tableInfoHTML(room.rules);
@@ -683,22 +700,9 @@ function renderGame(g: GameView) {
   const isClaim = g.phase === 'claim';
   const assessment = g.winAssessment;
   const blocked = assessment && assessment.qualifying < assessment.minimum;
-  const guidance = isClaim
-    ? g.claim?.submitted
-      ? `Call received: ${g.claim.submitted}. Resolving priority…`
-      : g.actions.length
-        ? 'CALL THE TILE'
-        : 'Another player can call…'
-    : myTurn
-      ? riichiMode
-        ? 'Choose your riichi discard'
-        : 'YOUR TURN'
-      : playing
-        ? `${esc(g.players[g.turn].profile.name)}’s turn`
-        : 'HAND COMPLETE';
   setHTML(
     '#hand-guidance',
-    `<span class="turn-label ${myTurn || (isClaim && g.actions.length) ? 'your-turn' : ''}">${guidance}</span>${assessment ? `<button class="score-hint ${blocked ? 'below-minimum' : 'qualified'}" data-do="win-check">${blocked ? 'Complete shape' : 'Hand qualifies'} · ${assessment.qualifying}/${assessment.minimum} fan ${icon('book')}</button>` : '<span class="rack-tip">Your hand · drag to arrange</span>'}`,
+    `<strong>Your hand</strong>${assessment ? `<button class="score-hint ${blocked ? 'below-minimum' : 'qualified'}" data-do="win-check">${blocked ? 'Complete shape' : 'Hand qualifies'} · ${assessment.qualifying}/${assessment.minimum} fan ${icon('book')}</button>` : '<span class="rack-tip">Drag to arrange</span>'}`,
   );
   document.querySelector('#your-wind')!.textContent =
     `${WIND_SYMBOLS[(g.seat - g.dealer + 4) % 4]} ${WINDS[(g.seat - g.dealer + 4) % 4]}`;
@@ -715,6 +719,7 @@ function renderGame(g: GameView) {
     `<span class="meld-meter" aria-hidden="true">${Array.from({ length: 4 }, (_, i) => `<i class="${i < insight.locked ? 'filled' : ''}"></i>`).join('')}</span><span>${insight.locked}/4 melds</span><b>${insight.route}</b>`,
   );
   setHTML('#exposed-hand', meldsHTML(g));
+  document.querySelector<HTMLElement>('#recent-actions')!.hidden = false;
   renderLastActions(g);
   if (activeDialog === 'hand-detail') {
     setHTML('#hand-detail-body', handDetailHTML(g));
@@ -722,7 +727,13 @@ function renderGame(g: GameView) {
   }
   setHTML(
     '#action-dock',
-    `<div class="action-bar ${isClaim ? 'claim-active' : ''}"><div class="action-context">${isClaim ? `${tileStatic(g.claim!.tile, 'claim-tile')}<div><strong>${g.claim?.submitted ? 'CALL LOCKED IN' : g.actions.length ? 'MAKE YOUR CALL' : 'CLAIM PENDING'}</strong><small>${esc(g.players[g.claim!.from].profile.name)} ${g.claim!.reason === 'discard' ? 'discarded' : 'declared a kong'} · <b data-countdown="${g.claim!.deadline}"></b></small></div>` : myTurn ? `<span class="turn-seal">打</span><div><strong>${blocked ? 'MORE FAN NEEDED' : g.actions.some((a) => a.kind === 'win') ? 'WINNING HAND' : 'CHOOSE YOUR DISCARD'}</strong><small>${blocked ? `${assessment!.qualifying} of ${assessment!.minimum} qualifying fan · flowers do not qualify` : 'Select a tile, then discard'} <b data-countdown="${g.turnDeadline}"></b></small></div>` : `<span class="turn-seal">${g.phase === 'ended' || g.phase === 'finished' ? '和' : '風'}</span><div><strong>${g.phase === 'ended' || g.phase === 'finished' ? 'HAND COMPLETE' : 'TABLE IN PLAY'}</strong><small>${isClaim ? 'Resolving calls' : 'Arrange your tiles while you wait'}</small></div>`}</div><div class="action-buttons">${specials.map((a) => `<button class="button ${a.kind === 'win' ? 'gold win-action' : 'primary'}" data-action="${a.id}">${a.tiles.length && a.kind !== 'win' ? a.tiles.map((t) => tileStatic(t, 'tiny')).join('') : a.kind === 'win' ? '<span class="action-glyph">和</span>' : ''}<span>${esc(a.kind === 'pung' ? (g.rules.preset === 'riichi' ? 'Pon / Pung' : 'Pung / Pong') : a.kind === 'chow' ? a.label.replace(/^(Chow|Chi)/, g.rules.preset === 'riichi' ? 'Chi / Chow' : 'Chow / Chi') : a.label)}</span></button>`).join('')}${isClaim && g.actions.some((a) => a.kind === 'pass') ? '<button class="button outline" data-action="pass">Pass</button>' : ''}${g.actions.some((a) => a.kind === 'riichi') ? `<button class="button ${riichiMode ? 'primary' : 'outline'}" data-do="riichi">${riichiMode ? 'Cancel riichi' : 'Declare riichi'}</button>` : ''}${myTurn ? `<button class="button primary discard-button" data-do="discard" ${selected === null ? 'disabled' : ''}>${selected !== null ? `${riichiMode ? 'Riichi · ' : ''}Discard ${esc(tileName(selected))}` : 'Select a tile'} ${icon('arrow')}</button>` : g.phase === 'ended' ? '' : g.phase === 'finished' && state!.room!.host === state!.profile.id ? `<button class="button primary" data-do="rematch">Play another match ${icon('arrow')}</button>` : ''}</div>${isClaim ? `<div class="claim-time-bar"><i data-progress="${g.claim!.deadline}" data-duration="${g.rules.claimSeconds * 1000}"></i></div>` : ''}</div>`,
+    `<div class="action-bar ${isClaim ? 'claim-active' : ''}"><div class="action-context">${isClaim ? `${tileStatic(g.claim!.tile, 'claim-tile')}<div><strong>${g.claim?.submitted ? 'CALL LOCKED IN' : g.actions.length ? 'MAKE YOUR CALL' : 'CLAIM PENDING'}</strong><small>${esc(g.players[g.claim!.from].profile.name)} ${g.claim!.reason === 'discard' ? 'discarded' : 'declared a kong'} · <b data-countdown="${g.claim!.deadline}"></b></small></div>` : myTurn ? `<span class="turn-seal">打</span><div><strong>${riichiMode ? 'Your turn · declare riichi' : 'Your turn'}</strong><small>${riichiMode ? 'Choose a tile for your riichi discard' : 'Choose a tile to discard'} <b data-countdown="${g.turnDeadline}"></b></small></div>` : `<span class="turn-seal">${g.phase === 'ended' || g.phase === 'finished' ? '和' : '風'}</span><div><strong>${g.phase === 'ended' || g.phase === 'finished' ? 'Hand complete' : `${esc(g.players[g.turn].profile.name)}’s turn`}</strong><small>${isClaim ? 'Resolving calls' : 'Arrange your tiles while you wait'}</small></div>`}</div><div class="action-buttons">${specials.map((a) => `<button class="button ${a.kind === 'win' ? 'gold win-action' : 'primary'}" data-action="${a.id}">${a.tiles.length && a.kind !== 'win' ? a.tiles.map((t) => tileStatic(t, 'tiny')).join('') : a.kind === 'win' ? '<span class="action-glyph">和</span>' : ''}<span>${esc(a.kind === 'pung' ? (g.rules.preset === 'riichi' ? 'Pon / Pung' : 'Pung / Pong') : a.kind === 'chow' ? a.label.replace(/^(Chow|Chi)/, g.rules.preset === 'riichi' ? 'Chi / Chow' : 'Chow / Chi') : a.label)}</span></button>`).join('')}${isClaim && g.actions.some((a) => a.kind === 'pass') ? '<button class="button outline" data-action="pass">Pass</button>' : ''}${g.actions.some((a) => a.kind === 'riichi') ? `<button class="button ${riichiMode ? 'primary' : 'outline'}" data-do="riichi">${riichiMode ? 'Cancel riichi' : 'Declare riichi'}</button>` : ''}${g.phase === 'finished' && state!.room!.host === state!.profile.id ? `<button class="button primary" data-do="rematch">Play another match ${icon('arrow')}</button>` : ''}</div>${isClaim ? `<div class="claim-time-bar"><i data-progress="${g.claim!.deadline}" data-duration="${g.rules.claimSeconds * 1000}"></i></div>` : ''}</div>`,
+  );
+  setHTML(
+    '#discard-action',
+    myTurn
+      ? `<div class="primary-discard"><button class="button primary discard-button" data-do="discard" aria-describedby="discard-help" ${selected === null ? 'disabled' : ''}>${riichiMode ? 'Riichi · ' : ''}Discard selected tile ${icon('arrow')}</button><small id="discard-help" role="status">${selected === null ? 'Select a tile in your hand to enable discard.' : `Selected: ${esc(tileName(selected))}`}</small></div>`
+      : '',
   );
   setHTML('#round-transition', g.phase === 'ended' ? nextHandHTML(g) : '');
   if (activeDialog === 'result') setHTML('#next-hand-panel', nextHandHTML(g));
@@ -740,65 +751,55 @@ function renderGame(g: GameView) {
 }
 function renderDiscardLedger(g: GameView) {
   const groups = summarizeDiscards(g.players);
+  setHTML('#discard-count', String(groups.reduce((sum, group) => sum + group.count, 0)));
   setHTML(
     '#discard-groups',
     groups.length
       ? groups
           .map(
             ({ tile, count, claimed }) =>
-              `<div class="discard-group ${count === 4 ? 'all-seen' : ''}" data-kind="${Math.floor(tile / 4)}" aria-label="${esc(tileName(tile))}: ${count} discarded${claimed ? `, ${claimed} called` : ''}">${tileStatic(tile)}<strong>${count}<span> / 4</span></strong><small>${esc(tileName(tile))}</small>${claimed ? `<em>${claimed} called</em>` : ''}</div>`,
+              `<div class="discard-group ${count === 4 ? 'all-seen' : ''}" data-kind="${Math.floor(tile / 4)}" aria-label="${esc(tileName(tile))}: ${count} discarded${claimed ? `, ${claimed} called` : ''}">${tileStatic(tile)}<strong>${count}<span> / 4</span></strong><small>${esc(tileName(tile))}</small>${claimed ? `<em>${claimed} called</em>` : ''}<span class="discard-seats">${g.players
+                .flatMap((p, seat) => {
+                  const count = p.discards.filter(
+                    (d) => Math.floor(d.tile / 4) === Math.floor(tile / 4),
+                  ).length;
+                  return count ? [`${WINDS[(seat - g.dealer + 4) % 4]} ${count}`] : [];
+                })
+                .join(' · ')}</span></div>`,
           )
           .join('')
       : '<p class="ledger-empty">The river is empty.<br>Discarded tiles will collect here.</p>',
   );
 }
-function setDiscardsOpen(open: boolean) {
-  const ledger = document.querySelector<HTMLElement>('#discard-ledger');
-  if (ledger) ledger.hidden = !open;
-  document.querySelector('.discard-trigger')?.setAttribute('aria-expanded', String(open));
+function setTableToolOpen(tool: 'discards' | 'activity', open: boolean, restoreFocus = false) {
+  const panel = document.querySelector<HTMLElement>(
+    tool === 'discards' ? '#discard-ledger' : '#recent-events',
+  );
+  const trigger = document.querySelector<HTMLButtonElement>(`[data-do="${tool}"]`);
+  if (!panel || !trigger) return;
+  if (open) setTableToolOpen(tool === 'discards' ? 'activity' : 'discards', false);
+  panel.hidden = !open;
+  trigger.setAttribute('aria-expanded', String(open));
+  if (tool === 'discards') trigger.setAttribute('aria-pressed', String(open));
+  if (restoreFocus) trigger.focus({ preventScroll: true });
+  if (open) {
+    panel.scrollIntoView({ block: 'nearest' });
+    if (tool === 'activity')
+      panel.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true });
+  }
 }
-function closeDiscards() {
-  const inspector = document.querySelector<HTMLElement>('#discard-inspector');
-  if (inspector) inspector.dataset.pinned = '';
-  document.querySelector('.discard-trigger')?.setAttribute('aria-pressed', 'false');
-  setDiscardsOpen(false);
+function toggleTableTool(tool: 'discards' | 'activity') {
+  const trigger = document.querySelector(`[data-do="${tool}"]`);
+  setTableToolOpen(tool, trigger?.getAttribute('aria-expanded') !== 'true');
 }
-function toggleDiscards() {
-  const inspector = document.querySelector<HTMLElement>('#discard-inspector')!;
-  inspector.dataset.pinned = inspector.dataset.pinned ? '' : 'true';
-  document
-    .querySelector('.discard-trigger')!
-    .setAttribute('aria-pressed', String(!!inspector.dataset.pinned));
-  setDiscardsOpen(!!inspector.dataset.pinned);
-  if (inspector.dataset.pinned)
-    document.querySelector('#discard-ledger')?.scrollIntoView({ block: 'nearest' });
-}
-function bindDiscardInspector() {
-  const inspector = document.querySelector<HTMLElement>('#discard-inspector')!;
-  let leaveTimer: ReturnType<typeof setTimeout> | undefined;
-  inspector.addEventListener('pointerenter', (event) => {
-    clearTimeout(leaveTimer);
-    if (event.pointerType === 'mouse') setDiscardsOpen(true);
-  });
-  inspector.addEventListener('pointerleave', () => {
-    leaveTimer = setTimeout(() => {
-      if (!inspector.dataset.pinned && !inspector.contains(document.activeElement))
-        setDiscardsOpen(false);
-    }, 180);
-  });
-  inspector.addEventListener('focusin', () => {
-    setDiscardsOpen(true);
-    document.querySelector('#discard-ledger')?.scrollIntoView({ block: 'nearest' });
-  });
-  inspector.addEventListener('focusout', (event) => {
-    if (!inspector.dataset.pinned && !inspector.contains(event.relatedTarget as Node))
-      setDiscardsOpen(false);
-  });
-  inspector.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      document.querySelector<HTMLElement>('.discard-trigger')!.focus();
-      closeDiscards();
+function bindTableTools() {
+  document.querySelector('.game-window')!.addEventListener('keydown', (event) => {
+    if ((event as KeyboardEvent).key !== 'Escape' || modal.open) return;
+    for (const tool of ['discards', 'activity'] as const) {
+      if (document.querySelector(`[data-do="${tool}"]`)?.getAttribute('aria-expanded') === 'true') {
+        event.preventDefault();
+        setTableToolOpen(tool, false, true);
+      }
     }
   });
 }
@@ -949,7 +950,7 @@ function showCreateLobby() {
 }
 function helpBody(r?: Rules) {
   const preset = r?.preset ?? 'singapore';
-  return `<div class="help-body"><div class="help-lead">${mark}<p>Four players, a wall of tiles,<br>and a little possibility in every draw.</p></div><ol class="help-steps"><li><strong>Build a winning hand.</strong><p>Usually four sets and a pair: three identical tiles (pung), three consecutive suited tiles (chow), or four identical tiles (kong). Special hands depend on the tradition.</p></li><li><strong>Draw, consider, discard.</strong><p>Your draw arrives automatically. Drag tiles to arrange them, or use Alt + Left/Right on a focused tile. Sort tiles restores suit order. Select a tile, then press Discard. If your turn expires, the server discards your drawn tile. Tap any tile to see its name.</p></li><li><strong>See a tile you need? Make a call.</strong><p>Every legal win, pung, kong, and chow appears in the action dock inside the game window. Hover, focus, or tap Discards at the bottom-right of the board to inspect discarded tiles and counts. Chows come only from the player before you. Choose a sequence when several chows are legal.</p></li><li><strong>Let the table resolve the call.</strong><p>Wins have first priority. ${r?.meldPriority === 'equal' ? 'All meld calls share priority.' : r?.meldPriority === 'chow-first' ? 'Chows precede pungs and kongs.' : 'Pungs and kongs precede chows.'} The earliest valid click received by the server wins a tie. A lower-priority claim waits for possible higher claims. ${r?.claimSeconds ?? 8} seconds to respond; silence passes.</p></li></ol><div class="help-variant"><span class="eyebrow">${esc(r?.name ?? PRESETS[preset].name)}</span><h3>${PRESET_DETAILS[preset].subtitle}</h3><p>${preset === 'riichi' ? 'A yaku is required; dora alone cannot win. Declare riichi on a closed, ready hand, then discard only your draws. Furiten blocks ron when your waits include your own discards or when you have passed a winning tile. The fourteen-tile dead wall supplies kan draws and dora.' : preset === 'mcr' ? 'Reach eight fan before counting flowers. The scoring engine considers MCR patterns, including seven pairs, knitted hands, and thirteen orphans. Flowers are exposed and replaced automatically. The dealer advances after every hand.' : 'Flowers, seasons, and animals reveal and replace automatically. Own flowers and every animal add tai. Cat–rat and rooster–centipede pairs earn instant points. The default needs one tai, capped at five. Complete dragon/wind sets and flower collections can win special hands.'}</p><small>${PRESET_DETAILS[preset].source}</small></div>${r ? `<div class="help-variant"><span class="eyebrow">THIS TABLE</span><p>${r.rounds} winds · ${r.turnSeconds}s turns · ${r.claimSeconds}s claims · ${r.minimum} minimum ${r.preset === 'riichi' ? 'han' : r.preset === 'singapore' ? 'tai' : 'fan'} · ${r.scoreMultiplier}× point settlement.</p><p>Chows ${r.allowChow ? 'on' : 'off'} · Kongs ${r.allowKong ? 'on' : 'off'} · Seven pairs ${r.sevenPairs ? 'on' : 'off'}.</p><p>${r.chips ? `Each point changes your fake chips by ${r.chipsPerPoint}. You start with ${r.startingChips.toLocaleString()} fake chips.` : 'Fake chips are off.'} ${r.points ? 'Points are tracked.' : 'Point totals are off; qualifying scores still apply.'}</p>${r.houseBonuses.map((b) => `<p><strong>${esc(b.name)}</strong>: +${b.points} ${r.preset === 'riichi' ? 'points' : r.preset === 'mcr' ? 'fan' : 'tai'} for ${b.condition}.</p>`).join('')}</div>` : ''}<p class="help-source">Compare the <a href="https://mahjong-europe.org/portal/images/docs/mcr_EN.pdf" target="_blank" rel="noopener">MCR rulebook</a>, <a href="https://mahjong-europe.org/portal/images/docs/Riichi-rules-2025-EN.pdf" target="_blank" rel="noopener">EMA 2025 rules</a>, and <a href="https://singaporemahjong.com/rules/" target="_blank" rel="noopener">Singapore source</a>. Four Winds uses the online adaptations and Singapore profile documented in the project.</p><div class="form-note">${icon('leaf')} Points and chips are for play. No real money, payments, or cash-out.</div></div>`;
+  return `<div class="help-body"><div class="help-lead">${mark}<p>Four players, a wall of tiles,<br>and a little possibility in every draw.</p></div><ol class="help-steps"><li><strong>Build a winning hand.</strong><p>Usually four sets and a pair: three identical tiles (pung), three consecutive suited tiles (chow), or four identical tiles (kong). Special hands depend on the tradition.</p></li><li><strong>Draw, consider, discard.</strong><p>Your draw arrives automatically. Drag tiles to arrange them, or use Alt + Left/Right on a focused tile. Sort tiles restores suit order. Select a tile, then press Discard. If your turn expires, the server discards your drawn tile. Tap any tile to see its name.</p></li><li><strong>See a tile you need? Make a call.</strong><p>Every legal win, pung, kong, and chow appears in the action dock inside the game window. Open Discard ledger beside the board to inspect discarded tiles and counts. Recent activity shows the last discard and turn; open it for recent events. Chows come only from the player before you. Choose a sequence when several chows are legal.</p></li><li><strong>Let the table resolve the call.</strong><p>Wins have first priority. ${r?.meldPriority === 'equal' ? 'All meld calls share priority.' : r?.meldPriority === 'chow-first' ? 'Chows precede pungs and kongs.' : 'Pungs and kongs precede chows.'} The earliest valid click received by the server wins a tie. A lower-priority claim waits for possible higher claims. ${r?.claimSeconds ?? 8} seconds to respond; silence passes.</p></li></ol><div class="help-variant"><span class="eyebrow">${esc(r?.name ?? PRESETS[preset].name)}</span><h3>${PRESET_DETAILS[preset].subtitle}</h3><p>${preset === 'riichi' ? 'A yaku is required; dora alone cannot win. Declare riichi on a closed, ready hand, then discard only your draws. Furiten blocks ron when your waits include your own discards or when you have passed a winning tile. The fourteen-tile dead wall supplies kan draws and dora.' : preset === 'mcr' ? 'Reach eight fan before counting flowers. The scoring engine considers MCR patterns, including seven pairs, knitted hands, and thirteen orphans. Flowers are exposed and replaced automatically. The dealer advances after every hand.' : 'Flowers, seasons, and animals reveal and replace automatically. Own flowers and every animal add tai. Cat–rat and rooster–centipede pairs earn instant points. The default needs one tai, capped at five. Complete dragon/wind sets and flower collections can win special hands.'}</p><small>${PRESET_DETAILS[preset].source}</small></div>${r ? `<div class="help-variant"><span class="eyebrow">THIS TABLE</span><p>${r.rounds} winds · ${r.turnSeconds}s turns · ${r.claimSeconds}s claims · ${r.minimum} minimum ${r.preset === 'riichi' ? 'han' : r.preset === 'singapore' ? 'tai' : 'fan'} · ${r.scoreMultiplier}× point settlement.</p><p>Chows ${r.allowChow ? 'on' : 'off'} · Kongs ${r.allowKong ? 'on' : 'off'} · Seven pairs ${r.sevenPairs ? 'on' : 'off'}.</p><p>${r.chips ? `Each point changes your fake chips by ${r.chipsPerPoint}. You start with ${r.startingChips.toLocaleString()} fake chips.` : 'Fake chips are off.'} ${r.points ? 'Points are tracked.' : 'Point totals are off; qualifying scores still apply.'}</p>${r.houseBonuses.map((b) => `<p><strong>${esc(b.name)}</strong>: +${b.points} ${r.preset === 'riichi' ? 'points' : r.preset === 'mcr' ? 'fan' : 'tai'} for ${b.condition}.</p>`).join('')}</div>` : ''}<p class="help-source">Compare the <a href="https://mahjong-europe.org/portal/images/docs/mcr_EN.pdf" target="_blank" rel="noopener">MCR rulebook</a>, <a href="https://mahjong-europe.org/portal/images/docs/Riichi-rules-2025-EN.pdf" target="_blank" rel="noopener">EMA 2025 rules</a>, and <a href="https://singaporemahjong.com/rules/" target="_blank" rel="noopener">Singapore source</a>. Four Winds uses the online adaptations and Singapore profile documented in the project.</p><div class="form-note">${icon('leaf')} Points and chips are for play. No real money, payments, or cash-out.</div></div>`;
 }
 function nextHandHTML(g: GameView) {
   if (g.phase !== 'ended') return '';
@@ -1114,6 +1115,11 @@ app.addEventListener('click', async (e) => {
   const button = (e.target as Element).closest<HTMLElement>('button, [data-do]');
   if (!button || button.hasAttribute('disabled')) return;
   try {
+    if (button.dataset.social === 'queue-mode' && state?.room?.game) {
+      selected = null;
+      renderGame(state.room.game);
+      return;
+    }
     if (isTableTheme(button.dataset.themeChoice) && state?.room) {
       applyTheme(button.dataset.themeChoice);
       const saved = saveTableTheme(state.profile.id, theme);
@@ -1216,10 +1222,16 @@ app.addEventListener('click', async (e) => {
         showWinCheck();
         break;
       case 'discards':
-        toggleDiscards();
+        toggleTableTool('discards');
         break;
       case 'close-discards':
-        closeDiscards();
+        setTableToolOpen('discards', false, true);
+        break;
+      case 'activity':
+        toggleTableTool('activity');
+        break;
+      case 'close-activity':
+        setTableToolOpen('activity', false, true);
         break;
       case 'log': {
         const drawer = document.querySelector<HTMLElement>('#game-drawer')!;

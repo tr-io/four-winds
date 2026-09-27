@@ -6,7 +6,7 @@ import { GameService } from '../../server/service';
 import { applyAction, gameView, newPlayer, startGame } from '../../server/engine';
 import { PRESETS } from '../../shared/rules';
 import { makeWall } from '../../shared/tiles';
-import type { Game } from '../../shared/types';
+import type { Game, Preset } from '../../shared/types';
 
 export const test = base.extend<{ tableServer: { service: GameService; url: string } }>({
   tableServer: async ({}, use) => {
@@ -39,12 +39,13 @@ export async function setup(
   page: Page,
   server: { service: GameService; url: string },
   pattern = 'rack',
+  preset: Preset = 'mcr',
 ) {
   await page.goto(server.url);
   await expect(page.locator('#connection-text')).toHaveText('Connected');
   const session = [...server.service.sessions.values()][0];
   session.profile.name = 'Akira';
-  const rules = { ...structuredClone(PRESETS.mcr), claimSeconds: 30, turnSeconds: 120 };
+  const rules = { ...structuredClone(PRESETS[preset]), claimSeconds: 30, turnSeconds: 120 };
   const players = [
     session.profile,
     ...[1, 2, 3].map((i) => ({
