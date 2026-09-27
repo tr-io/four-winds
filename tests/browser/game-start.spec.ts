@@ -82,12 +82,25 @@ for (const preset of ['mcr', 'riichi', 'singapore', 'legacy'] as const) {
     tableServer,
   }) => {
     await page.emulateMedia({ reducedMotion: 'no-preference' });
+    // Sampling CSS animations does not pause the effect's JavaScript cleanup timer.
+    // Hold that timer while screenshots and assertions inspect each opening stage.
+    await page.clock.install();
     await setup(page, tableServer, 'waiting');
+    // Pause before the deal exists, leaving time for the command to reach a busy renderer.
+    await page.clock.pauseAt(Date.now() + 5000);
     const room = tableServer.service.rooms.get('TEST01')!;
     room.rules = { ...PRESETS[preset === 'legacy' ? 'mcr' : preset], turnSeconds: 120 };
     room.game = startGame(room.rules, room.players, 2026);
     if (preset === 'legacy') delete room.game.setup;
     tableServer.service.broadcast();
+    // Socket.IO dispatches received messages on a timer; let that delivery finish
+    // without letting the cleanup timer run during real-world screenshot delays.
+    await expect
+      .poll(async () => {
+        await page.clock.runFor(50);
+        return page.locator('[data-effect="deal"]').count();
+      })
+      .toBe(1);
     await expect(page.locator('[data-effect="deal"]')).toBeVisible();
     const sample = (time: number) =>
       page.locator('[data-effect="deal"]').evaluate((effect, time) => {
@@ -150,5 +163,7 @@ for (const preset of ['mcr', 'riichi', 'singapore', 'legacy'] as const) {
       second: false,
       deal: true,
     });
+    await page.clock.fastForward(dealSequence(room.game).duration);
+    await expect(page.locator('[data-effect="deal"]')).toHaveCount(0);
   });
 }

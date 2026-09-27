@@ -25,8 +25,26 @@ before relying on the snapshot. Start with the user's latest request.
   reserve their wrapped height. Compact seat cards wrap chip totals. The original lotus remains
   usable and clear of seat presence indicators.
 - [Control guide](docs/live-table-interface.md) records current semantics and how to try each
-  control. GitHub CI is pending after push. No merge or deployment was requested; production is
-  unchanged. Reuse this branch for follow-ups while PR #8 is open.
+  control. No merge or deployment was requested; production is unchanged. Reuse this branch for
+  follow-ups while PR #8 is open.
+- CI follow-up: runs `36341227163` and `36341243107` failed in the MCR opening-stage test and
+  the four-client profile/lobby/reconnect test; the other 59 desktop tests passed. Reproduced
+  both failures in an Ubuntu 24.04 Playwright container limited to two CPUs. CSS animation
+  sampling did not stop the deal cleanup timer, so screenshots could outlive the element.
+  The opening-stage tests now freeze browser time before starting, advance Socket.IO delivery
+  explicitly, and verify cleanup by advancing the clock after all stage assertions.
+- The four-client test exhausted its overall deadline while rendering four WebGL views.
+  It now uses compact 800×600 peer views with reduced motion and a three-minute total budget,
+  preserving the full primary view/animation, real connections, reconnect assertions, and
+  individual assertion deadlines.
+  Disabling trace screenshots alone did not solve the timeout; full tracing remains enabled.
+  CI now retains browser failure traces/screenshots for seven days. Check the latest
+  [PR checks](https://github.com/tr-io/four-winds/pull/8/checks) before merging.
+- Follow-up verification: all 101 unit/network tests and all nine affected browser tests pass
+  locally; the final peer-motion change also passes its focused local rerun. In the constrained
+  Linux container, all four opening variants pass and the final four-client test passes in
+  about 80 seconds. Types/build, formatting, and diff checks pass. No production code changed
+  for this CI fix.
 
 ## Previous handoff
 

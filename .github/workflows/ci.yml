@@ -27,6 +27,14 @@ jobs:
       - run: npx playwright install --with-deps chromium webkit
       - run: npm run test:e2e
       - run: npm run test:mobile
+      - name: Upload browser failure details
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: browser-failure-details
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Validate release Compose
         env:
           DOMAIN: mahjong.example.com
