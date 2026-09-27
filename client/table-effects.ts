@@ -22,7 +22,7 @@ export class TableEffects {
     effect.className = `call-effect ${kind === 'win' ? 'win-effect' : ''}`;
     effect.dataset.effect = kind;
     effect.setAttribute('role', 'status');
-    effect.innerHTML = `<div class="effect-rays" aria-hidden="true"></div><div class="effect-ring" aria-hidden="true"></div><div class="call-cut"><span class="call-glyph" aria-hidden="true"></span><div><span class="call-player"></span><strong class="call-title"></strong><small class="call-detail"></small></div></div><div class="effect-particles" aria-hidden="true"></div>`;
+    effect.innerHTML = `<div class="impact-frame" aria-hidden="true"></div><div class="fire-aura" aria-hidden="true">${Array.from({ length: kind === 'win' ? 18 : 10 }, (_, i) => `<i style="--ember:${i};--x:${(i * 61) % 100}%;--rise:${110 + (i % 5) * 24}px"></i>`).join('')}</div><div class="effect-rays" aria-hidden="true"></div><div class="effect-ring" aria-hidden="true"></div><div class="call-cut"><span class="call-glyph" aria-hidden="true"></span><div><span class="call-player"></span><strong class="call-title"></strong><small class="call-detail"></small></div></div><div class="effect-particles" aria-hidden="true"></div>`;
     effect.querySelector('.call-glyph')!.textContent = glyph;
     effect.querySelector('.call-player')!.textContent = player;
     effect.querySelector('.call-title')!.textContent = label;

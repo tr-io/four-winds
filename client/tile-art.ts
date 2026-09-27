@@ -44,7 +44,7 @@ export function drawTileFace(tile: number): HTMLCanvasElement {
       c.arc(72, 80, 12, 0, Math.PI * 2);
       c.fill();
       c.fillStyle = green;
-      c.font = 'bold 22px Georgia';
+      c.font = 'bold 28px sans-serif';
       c.fillText(`${(i % 4) + 1}`, 22, 24);
     } else {
       c.font = '65px "Apple Color Emoji","Segoe UI Emoji",sans-serif';
@@ -208,10 +208,10 @@ export function drawTileFace(tile: number): HTMLCanvasElement {
     }
   }
   if (k < 27) {
-    c.fillStyle = '#526259';
-    c.font = 'bold 14px sans-serif';
+    c.fillStyle = '#253f49';
+    c.font = 'bold 24px sans-serif';
     c.textAlign = 'left';
-    c.fillText(String(r), 9, 13);
+    c.fillText(String(r), 8, 15);
   }
   return canvas;
 }
@@ -221,8 +221,8 @@ export function tileImage(tile: number) {
   return cache.get(k)!;
 }
 export function tileHTML(tile: number, className = '', attrs = '') {
-  return `<button class="tile ${className}" title="${tileName(tile)}" aria-label="${tileName(tile)}" ${attrs}><img src="${tileImage(tile)}" alt="" draggable="false"/></button>`;
+  return `<button class="tile ${className}" data-tile-name="${tileName(tile)}" aria-label="${tileName(tile)}" ${attrs}><img src="${tileImage(tile)}" alt="" draggable="false"/></button>`;
 }
 export function tileStatic(tile: number, className = '') {
-  return `<span class="tile ${className}" title="${tileName(tile)}"><img src="${tileImage(tile)}" alt="${tileName(tile)}" draggable="false"/></span>`;
+  return `<span class="tile ${className}" data-tile-name="${tileName(tile)}" tabindex="0" role="img" aria-label="${tileName(tile)}"><img src="${tileImage(tile)}" alt="" draggable="false"/></span>`;
 }

@@ -139,6 +139,8 @@ export class HandRack {
       this.element.setPointerCapture(e.pointerId);
       this.ghost = source.cloneNode(true) as HTMLElement;
       this.ghost.removeAttribute('data-tile');
+      this.ghost.removeAttribute('data-tile-name');
+      this.ghost.removeAttribute('aria-describedby');
       this.ghost.setAttribute('aria-hidden', 'true');
       this.ghost.className = 'tile rack-ghost';
       const rect = source.getBoundingClientRect();

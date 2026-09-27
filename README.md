@@ -24,7 +24,7 @@ Open **http://localhost:3001**. `PORT` and `DATA_FILE` can override the server p
 
 ## Table controls
 
-The Three.js table, player panels, tile rack, claims, and timers share one game window. Drag tiles to reorder them, or focus a tile and use **Alt + Left/Right**. **Sort tiles** restores suit order. Hover, focus, or tap the center **Discards** seal for a sorted tile/count ledger. The toolbar opens the game log and rules. Claim cut-ins and a separate mahjong celebration respect reduced-motion settings.
+The Three.js table, player panels, tile rack, claims, and timers share one game window. Drag tiles to reorder them, or focus a tile and use **Alt + Left/Right**. **Sort tiles** restores suit order. Hover, focus, or tap the center **Discards** seal for a sorted tile/count ledger. The toolbar opens the game log, table settings, and rules. Last-discard and last-turn bubbles retain the recent action. Hover or focus tiles for English names; tap on mobile. Select the meld meter to inspect your hand, exposed sets, suit counts, and pair candidates. Claim cut-ins and a separate mahjong celebration respect reduced-motion settings.
 
 A complete MCR hand still needs eight fan before flowers. Click its qualification badge for a server-calculated breakdown; use a saved house ruleset with a lower minimum for basic-hand play.
 
@@ -42,6 +42,8 @@ The server validates every action. Higher-priority claims beat lower-priority cl
 ## Rules and house rules
 
 Read [the rules research note](docs/rules-research.md) for sources, versions, differences, and the specific **Four Winds Singapore v1** profile. Riichi uses EMA 2025 plus its June 2026 annotations. The MCR scorer covers the 81-pattern family; integration fixes are shipped as reproducible dependency patches. The online game has explicit adaptations to physical tournament play.
+
+Use **Configure rules** during table creation, or the settings button at a waiting table. The table host and containing lobby host can edit before the first deal; all seats receive the changes. Orange dots mark differences from the preset. Rules lock for the match when play starts, and any player can save a copy. Editing a saved ruleset separately does not alter an existing table.
 
 The ruleset editor changes actual legal actions, timing, winning thresholds, settlements, tile sets, or ledgers. Custom bonuses have executable conditions: self-draw, closed hand, all pungs, or full flush. In Riichi, custom bonuses add flat points after the standard calculation and cannot substitute for a yaku.
 

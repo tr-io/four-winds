@@ -13,7 +13,7 @@ When reinstalling dependencies, stop the running dev server with **Ctrl+C** firs
 
 Open **http://localhost:5175**. You should see the Four Winds lobby, a 3D table preview, and **Connected** in the header. If another service already occupies that address, use the Network address printed by Vite or change the `server.port` in `vite.config.ts`.
 
-Use a recent Chrome, Firefox, Safari, or Edge. WebGL renders the table; the hand buttons and game controls remain available if WebGL is unavailable. Browser sound starts muted; use the speaker button to enable it.
+Use a recent Chrome, Firefox, Safari, or Edge. WebGL renders the table; the hand buttons and game controls remain available if WebGL is unavailable. Sound starts muted on the first visit. The speaker button toggles sound; the table settings panel includes a volume slider. Both preferences are saved in this browser.
 
 ## 2. One person, three bots
 
@@ -25,12 +25,22 @@ Use a recent Chrome, Firefox, Safari, or Edge. WebGL renders the table; the hand
 6. Review a hand's scoring breakdown, then select **Ready for the next hand**.
 7. Try all three presets. Singapore exposes flowers and animals and draws replacements automatically.
 
+### Configure a table before dealing
+
+1. Select **Create a table → Configure rules**. Choose MCR, Riichi, or Singapore. Use the **Play**, **Scoring**, **Chips**, and **Bonuses** tabs to edit the clocks, calls, scoring, fake chips, and house bonuses. Variant-specific controls appear for the selected preset.
+2. Orange dots and highlighted fields mark changes from that preset. Select **Use these rules**, then create the table. For immediate bot play, configure rules before checking **Fill empty seats with bots**.
+3. At a waiting table, the **settings** button opens the full editor for the table host or the containing lobby's host. Select **Apply table rules**. Other players should immediately see the new values, including updated starting balances. Their settings panel is read-only.
+4. Start the game. Settings now show **Locked for this match** for everyone. The server rejects edits after the first deal. **Save a copy to my rulesets** keeps the active configuration for a future table.
+
 ### Table controls and effects
 
+- **Recent actions:** the **Last discard** bubble retains the discarded tile and its player after a claim or the next draw. **Last turn** shows the most recent draw, discard, call, bonus, or win. Reload to verify these restore from the server's log. An opponent's draw never reveals its tile.
+- **Tile names:** hover any rack, meld, bonus, indicator, discard, claim, or result tile for its English name. Keyboard focus works on HTML tiles; on touch screens, tap. Face-up tiles on the 3D table also support pointer inspection. Tile backs must never reveal names.
+- **Your hand:** select the meld meter beside **Sort tiles**. Declared melds fill the four set slots; the inspector shows the current concealed tiles, larger melds, suit counts, and possible pairs. This describes your tiles; the server still decides whether a hand qualifies to win. Hover individual exposed tiles in either view.
 - **Arrange the rack:** drag a tile to another position with a mouse or finger. On a keyboard, focus a tile and press **Alt + Left/Right**. **Sort tiles** restores suit/rank order. Arrange tiles during other players' turns too. Refresh to confirm that your order survives reconnects. Moving a tile must never discard it.
 - **Read the river:** hover over, focus, or tap the circular **Discards** seal in the middle of the board. The ledger groups discards by tile kind, sorted by suit and rank, with each count underneath. Called discards remain in the historical count and show a separate “called” annotation. Tap to pin it; use its close button or **Escape** to dismiss it.
 - **Inspect scoring:** a complete MCR shape shows its qualifying fan beside your hand. Click it for a breakdown. MCR needs eight fan **excluding flowers**. For basic four-set-and-pair play, save a house ruleset with **Minimum fan = 0** before creating a new table.
-- **Claims and wins:** a resolved call produces a character/title cut-in, tile movement, particles, and a brief camera impact. Mahjong has a longer gold burst before the score panel. These visuals do not delay the server or block action buttons. Enable sound for call tones and the win arpeggio. Enable the operating system's reduced-motion setting to check the static presentation.
+- **Claims and wins:** a resolved call produces a character/title cut-in, a single stylized impact burst, ember trails, tile movement, and a brief camera impact. Mahjong has a longer fire-and-gold celebration before the score panel. These visuals do not delay the server or block action buttons. Enable sound for tile clicks, bonus chimes, percussion on calls, and a rising victory chord. Adjust volume in table settings. Enable the operating system's reduced-motion setting to check the static presentation.
 - **Game log and help:** use the clock and book buttons in the table toolbar. Both open inside the game view. On desktop, the diagonal-arrow button toggles fullscreen.
 - **Small screens:** try 390 × 844 portrait and 844 × 390 landscape. The rack uses two rows in portrait and moves beside the board in landscape. Claim buttons and discards should remain inside the viewport, including at browser zoom.
 
@@ -90,7 +100,9 @@ Anyone with a lobby/room code can join when a seat is available. Codes are invit
 | Timeout              | Let claim clock or turn clock expire                      | Silence passes a claim; turn timeout takes a win or discards the drawn tile                    |
 | Duplicate click      | Double-click a discard/claim                              | Request deduplication and decision IDs prevent a second state transition                       |
 | Fake chips           | Save a ruleset with chips and a non-default conversion    | Hand and instant-bonus point changes update the fake-chip ledger                               |
-| Rules are fixed      | Edit a saved ruleset after creating its room              | That room keeps its original rules snapshot                                                    |
+| Pregame settings     | Table/lobby host edits the waiting table                  | Every seat receives the changes; regular players cannot edit                                   |
+| Rules lock           | Try editing after the first deal                          | Settings are read-only and the server rejects edits                                            |
+| Saved rules          | Edit a saved ruleset independently                        | Existing tables keep their snapshot until a host explicitly applies table settings             |
 | Reduced motion       | Enable OS/browser reduced motion                          | Entrance/claim effects stop; gameplay remains usable                                           |
 
 The result screen is available again from the table if you close it. A match has a defined end after its selected winds, followed by a host-controlled rematch.
@@ -101,7 +113,7 @@ The result screen is available again from the table if you close it. A match has
 # Seeded dealing, legal actions, claim ordering, scoring, full hands,
 # four real Socket.IO clients, reconnect, persistence, origin rejection,
 # development module serving after dependency-cache cleanup,
-# local rack ordering and grouped discard counts
+# local rack ordering, grouped discard counts, host rule authorization and locks
 npm test
 
 # Type check and production client build
@@ -109,7 +121,8 @@ npm run build
 
 # Real Chromium interactions: profiles, custom rules, lobby/room creation,
 # four players, turns, reconnect, bots, mobile, safe text, reduced motion,
-# dragging, MCR qualification, grouped discards, claims and win effects
+# dragging, MCR qualification, grouped discards, claims and win effects,
+# tile tooltips, hand inspector, last actions, and synchronized table settings
 npx playwright install chromium
 npm run test:e2e
 ```

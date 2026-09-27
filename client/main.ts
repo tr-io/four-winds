@@ -7,15 +7,20 @@ import '@fontsource/cormorant-garamond/latin-500.css';
 import '@fontsource/cormorant-garamond/latin-600.css';
 import './style.css';
 import './game.css';
+import './refinements.css';
 import { io } from 'socket.io-client';
 import type { AppState, GameView, Preset, Rules } from '../shared/types';
-import { PRESETS, PRESET_DETAILS } from '../shared/rules';
+import { PRESETS, PRESET_DETAILS, rulesSchema } from '../shared/rules';
 import { WINDS, WIND_SYMBOLS, tileName } from '../shared/tiles';
 import { MahjongTable } from './table';
 import { tileStatic } from './tile-art';
 import { HandRack } from './hand-rack';
 import { summarizeDiscards } from './discards';
 import { TableEffects } from './table-effects';
+import { installTileTooltips, hideTileTooltip } from './tile-tooltip';
+import { GameAudio, type SoundCue } from './game-audio';
+import { handInsight } from './hand-insight';
+import { activeRuleKeys, ruleChanges, ruleLabels, ruleValue } from '../shared/rule-summary';
 function requestId() {
   if (crypto.randomUUID) return crypto.randomUUID();
   const bytes = crypto.getRandomValues(new Uint8Array(16));
@@ -64,9 +69,14 @@ let connected = false,
   offset = 0,
   activeDialog = '',
   lastResult = '',
-  sound = false,
-  audio: AudioContext | null = null,
+  sound = localStorage.getItem('four-winds-sound') === 'on',
   lastEvent = 0;
+let soundVolume = Number(localStorage.getItem('four-winds-volume') ?? 0.65);
+if (!Number.isFinite(soundVolume)) soundVolume = 0.65;
+const gameAudio = new GameAudio();
+gameAudio.configure(sound, soundVolume);
+installTileTooltips();
+let eventRoom = '';
 let knownPlayers = new Set<string>();
 let rack: HandRack | null = null;
 let effects: TableEffects | null = null;
@@ -95,7 +105,7 @@ const socket = io({
   },
   reconnection: true,
 });
-app.innerHTML = `<header class="site-header"><button class="brand" data-do="home">${mark}<span>Four Winds<small>THE FOUR WINDS CLUB</small></span></button><nav class="main-nav" aria-label="Main navigation"><button data-page="play" class="active">Play</button><button data-page="rules">Your rulesets</button><button data-page="learn">How to play</button></nav><div class="header-right"><span class="connection"><i></i><span id="connection-text">Connecting</span></span><button class="profile-button" data-do="profile"><span class="avatar jade" id="header-avatar">G</span><span id="profile-name">Guest</span>${icon('chevron')}</button></div></header><div id="connection-banner" role="status"></div><main id="content"></main><footer class="site-footer"><span>${mark} 東 南 西 北 · FOUR WINDS</span><span>Four players. Three traditions. One table.</span><span class="footer-safe">Play points & fake chips only.</span></footer><div id="toasts" aria-live="polite"></div><dialog id="modal"></dialog>`;
+app.innerHTML = `<header class="site-header"><button class="brand" data-do="home">${mark}<span>Four Winds<small>MAHJONG ONLINE</small></span></button><nav class="main-nav" aria-label="Main navigation"><button data-page="play" class="active">Play</button><button data-page="rules">Your rulesets</button><button data-page="learn">How to play</button></nav><div class="header-right"><span class="connection"><i></i><span id="connection-text">Connecting</span></span><button class="profile-button" data-do="profile"><span class="avatar jade" id="header-avatar">G</span><span id="profile-name">Guest</span>${icon('chevron')}</button></div></header><div id="connection-banner" role="status"></div><main id="content"></main><footer class="site-footer"><span>${mark} 東 南 西 北 · FOUR WINDS</span><span>Four players. Three traditions. One table.</span><span class="footer-safe">Play points & fake chips only.</span></footer><div id="toasts" aria-live="polite"></div><dialog id="modal"></dialog>`;
 const content = document.querySelector<HTMLElement>('#content')!;
 const modal = document.querySelector<HTMLDialogElement>('#modal')!;
 function toast(text: string, error = false) {
@@ -105,33 +115,8 @@ function toast(text: string, error = false) {
   document.querySelector('#toasts')!.append(t);
   setTimeout(() => t.remove(), 5000);
 }
-function tone(kind: 'tick' | 'claim' | 'win' = 'tick') {
-  if (!sound) return;
-  audio ??= new AudioContext();
-  void audio.resume();
-  const notes =
-    kind === 'win'
-      ? [392, 523.25, 659.25, 784, 1046.5]
-      : kind === 'claim'
-        ? [146.8, 293.7, 587.3]
-        : [420];
-  notes.forEach((frequency, index) => {
-    const oscillator = audio!.createOscillator();
-    const gain = audio!.createGain();
-    const at = audio!.currentTime + index * (kind === 'win' ? 0.075 : 0.04);
-    const duration = kind === 'win' ? 0.55 : 0.18;
-    oscillator.connect(gain);
-    gain.connect(audio!.destination);
-    oscillator.type = kind === 'claim' ? 'triangle' : 'sine';
-    oscillator.frequency.setValueAtTime(frequency, at);
-    if (kind !== 'win')
-      oscillator.frequency.exponentialRampToValueAtTime(frequency * 0.6, at + duration);
-    gain.gain.setValueAtTime(0, at);
-    gain.gain.linearRampToValueAtTime(0.045, at + 0.012);
-    gain.gain.exponentialRampToValueAtTime(0.001, at + duration);
-    oscillator.start(at);
-    oscillator.stop(at + duration + 0.01);
-  });
+function tone(kind: SoundCue = 'tick') {
+  gameAudio.play(kind);
 }
 function command(type: string, data?: unknown): Promise<Record<string, unknown>> {
   if (!connected) {
@@ -186,12 +171,16 @@ socket.on('state', (next: AppState) => {
   const g = state.room?.game;
   if (g) {
     if (!g.result && activeDialog === 'result') closeDialog();
-    const newest = g.events.at(-1);
-    if (newest && newest.id > lastEvent) {
-      if (lastEvent > 0)
-        tone(newest.type === 'win' ? 'win' : newest.type === 'claim' ? 'claim' : 'tick');
-      lastEvent = newest.id;
+    const eventKey = `${state.room!.code}:${g.handNumber}`;
+    if (eventRoom !== eventKey || (g.events.at(-1)?.id ?? 0) < lastEvent) {
+      eventRoom = eventKey;
+      lastEvent = g.events.at(-1)?.id ?? 0;
     }
+    const fresh = g.events.filter((e) => e.id > lastEvent && e.type !== 'info');
+    const newest =
+      [...fresh].reverse().find((e) => e.type === 'win' || e.type === 'claim') ?? fresh.at(-1);
+    if (newest) tone(newest.type as SoundCue);
+    lastEvent = g.events.at(-1)?.id ?? lastEvent;
     if (g.result) {
       const id = `${state.room!.code}:${g.handNumber}`;
       if (lastResult !== id) {
@@ -284,7 +273,7 @@ function render() {
 }
 function lobbyHTML() {
   return `<section class="lobby-top"><div class="lobby-name"><span class="section-dot"></span><button data-do="lobbies"><span id="lobby-label">The Four Winds Club</span>${icon('chevron')}</button><span class="soft-label" id="lobby-presence">A seat is waiting for you</span></div><button class="text-button" data-do="create-lobby">${icon('plus')} Create a lobby</button></section>
-<section class="hero"><div class="hero-copy"><span class="eyebrow light"><span></span> 四風 · MULTIPLAYER MAHJONG</span><h1>Read the table.<br>Rule the <em>winds.</em></h1><p>Three traditions. Four rivals. Your next winning hand.<br>Challenge friends or sharpen your game against bots.</p><div class="hero-actions"><button class="button gold" data-do="create">Create a table ${icon('diagonal')}</button><button class="button glass" data-do="join">Join with a code</button></div><div class="hero-foot">${icon('users')} DRAW. CALL. CONQUER.<span class="tiny-star">✦</span></div></div><div class="hero-visual"><div class="hero-halo"></div><div id="hero-table"></div><div class="table-label"><span class="live-dot"></span> THE TABLE IS SET <span>東 南 西 北</span></div><div class="floating-tile one">${tileStatic(132)}</div><div class="floating-tile two">${tileStatic(76)}</div></div></section>
+<section class="hero"><div class="hero-copy"><span class="eyebrow light"><span></span> 四風 · MULTIPLAYER MAHJONG</span><h1>One table.<br><em>Four winds.</em></h1><p>Mahjong with friends. MCR, Riichi, or Singapore.<br>Pick your rules. Take your seat.</p><div class="hero-actions"><button class="button gold" data-do="create">Create a table ${icon('diagonal')}</button><button class="button glass" data-do="join">Join with a code</button></div><div class="hero-foot">${icon('users')} FRIENDS WELCOME. BOTS READY.<span class="tiny-star">✦</span></div></div><div class="hero-visual"><div class="hero-halo"></div><div id="hero-table"></div><div class="table-label"><span class="live-dot"></span> THE TABLE IS SET <span>東 南 西 北</span></div><div class="floating-tile one">${tileStatic(132)}</div><div class="floating-tile two">${tileStatic(76)}</div></div></section>
 <section class="traditions"><div class="section-heading"><div><span class="eyebrow">SAME TABLE. DIFFERENT TRADITIONS.</span><h2>Choose your discipline.</h2></div><button class="text-button" data-page="learn">Explore the rules ${icon('arrow')}</button></div><div class="preset-grid">${(['mcr', 'riichi', 'singapore'] as Preset[]).map((p, i) => presetCard(p, i)).join('')}</div></section>
 <section class="open-tables"><div class="section-heading"><div class="heading-inline"><h2>Live tables.</h2><span class="soft-label">Your lobby’s tables</span></div><button class="text-button" data-do="share-lobby">${icon('copy')} Invite to lobby</button></div><div class="lobby-bottom"><div class="rooms-panel"><div class="room-list-head"><span>TABLE</span><span>TRADITION</span><span>SEATS</span><span></span></div><div id="room-list"></div></div><div class="practice-card"><div class="practice-icon">${icon('bot')}</div><div><span class="eyebrow">TRAINING TABLE</span><h3>Sharpen your instincts.</h3><p>Take on three bots. Learn the patterns. Plan your next call.</p><button class="text-button" data-do="practice">Play with bots ${icon('arrow')}</button></div></div></div></section>`;
 }
@@ -312,11 +301,11 @@ function renderRoomList() {
 }
 function roomShell() {
   return `<section class="game-window" aria-label="Mahjong game window">
-    <header class="game-toolbar"><button class="icon-button" data-do="leave" aria-label="Leave table">${icon('back')}</button><div class="game-wordmark">四風 <span>FOUR WINDS</span></div><div class="table-title"><strong id="room-title"></strong><span id="room-rules" class="rule-pill"></span></div><div class="game-tools"><span class="game-connection" data-link-state>${connected ? 'LIVE' : 'RECONNECTING'}</span><button class="text-button room-code-button" data-do="share-room" aria-label="Copy table invitation">${icon('copy')} <span id="room-code"></span></button><button class="icon-button" data-do="log" aria-label="Game log" aria-expanded="false">${icon('clock')}</button><button class="icon-button" data-do="sound" aria-label="Toggle game sounds">${icon(sound ? 'sound' : 'mute')}</button><button class="icon-button" data-do="help" aria-label="Table help">${icon('book')}</button><button class="icon-button fullscreen-button" data-do="fullscreen" aria-label="Toggle fullscreen">${icon('diagonal')}</button></div></header>
-    <div class="board-area"><div class="game-table table-entrance"><div class="table-grain"></div><div class="game-meta" id="game-meta"></div><div id="live-table"></div><div id="seat-overlays"></div><div id="table-status"></div><div id="table-effects" aria-live="polite"></div>
+    <header class="game-toolbar"><button class="icon-button" data-do="leave" aria-label="Leave table">${icon('back')}</button><div class="game-wordmark">四風 <span>FOUR WINDS</span></div><div class="table-title"><strong id="room-title"></strong><button id="room-rules" class="rule-pill" data-do="table-settings" aria-label="Table rules"></button></div><div class="game-tools"><span class="game-connection" data-link-state>${connected ? 'LIVE' : 'RECONNECTING'}</span><button class="text-button room-code-button" data-do="share-room" aria-label="Copy table invitation">${icon('copy')} <span id="room-code"></span></button><button class="icon-button" data-do="table-settings" aria-label="Table settings">${icon('settings')}</button><button class="icon-button" data-do="log" aria-label="Game log" aria-expanded="false">${icon('clock')}</button><button class="icon-button" data-do="sound" aria-label="Toggle game sounds">${icon(sound ? 'sound' : 'mute')}</button><button class="icon-button" data-do="help" aria-label="Table help">${icon('book')}</button><button class="icon-button fullscreen-button" data-do="fullscreen" aria-label="Toggle fullscreen">${icon('diagonal')}</button></div></header>
+    <div class="board-area"><div class="game-table table-entrance"><div class="table-grain"></div><div class="game-meta" id="game-meta"></div><div id="live-table"></div><div id="seat-overlays"></div><div id="table-status"></div><div id="recent-actions" class="recent-actions" aria-label="Last table actions"></div><div id="table-effects" aria-live="polite"></div>
       <div class="discard-inspector" id="discard-inspector"><button class="discard-trigger" data-do="discards" aria-label="Show discarded tiles" aria-expanded="false" aria-controls="discard-ledger"><span>河</span><small>DISCARDS</small></button><section class="discard-ledger" id="discard-ledger" aria-label="Discarded tiles" hidden><header><div><strong>Discard ledger</strong><small>All seats · sorted by suit and rank</small></div><button class="icon-button" data-do="close-discards" aria-label="Close discarded tiles">${icon('close')}</button></header><div id="discard-groups"></div><p>Counts include called tiles. “Called” tiles are now in exposed melds.</p></section></div>
     </div><aside class="game-drawer" id="game-drawer" hidden><header><strong>TABLE RECORD</strong><button class="icon-button" data-do="log" aria-label="Close game log">${icon('close')}</button></header><div id="table-sidebar"></div><div id="log-entries" role="log" aria-label="Game log"></div></aside></div>
-    <section id="hand-area" class="game-dock" aria-label="Your hand and actions"><div id="waiting-controls"></div><div id="playing-controls"><div id="action-dock"></div><div class="hand-header"><div id="hand-guidance"></div><div class="rack-tools"><span class="your-wind" id="your-wind"></span><button class="text-button" data-do="sort" aria-label="Sort tiles by suit and rank">Sort tiles ${icon('chevron')}</button></div></div><p id="rack-instructions" class="sr-only">Drag to arrange your tiles. With a tile focused, use Alt and Left or Right to move it. Select a playable tile, then press Discard.</p><div class="hand-tiles" role="group" aria-label="Your concealed tiles"></div><div id="exposed-hand" class="exposed-hand"></div><span class="sr-only" id="rack-announcement" role="status"></span></div></section>
+    <section id="hand-area" class="game-dock" aria-label="Your hand and actions"><div id="waiting-controls"></div><div id="playing-controls"><div id="action-dock"></div><div class="hand-header"><div id="hand-guidance"></div><div class="rack-tools"><button class="hand-insight-button" id="hand-shape" data-do="hand-detail" aria-label="Inspect your hand"></button><span class="your-wind" id="your-wind"></span><button class="text-button" data-do="sort" aria-label="Sort tiles by suit and rank">Sort tiles ${icon('chevron')}</button></div></div><p id="rack-instructions" class="sr-only">Drag to arrange your tiles. With a tile focused, use Alt and Left or Right to move it. Select a playable tile, then press Discard.</p><div class="hand-tiles" role="group" aria-label="Your concealed tiles"></div><div id="exposed-hand" class="exposed-hand"></div><span class="sr-only" id="rack-announcement" role="status"></span></div></section>
   </section>`;
 }
 function renderRoom() {
@@ -338,13 +327,131 @@ function renderRoom() {
     bindDiscardInspector();
   }
   document.querySelector('#room-title')!.textContent = room.name;
-  document.querySelector('#room-rules')!.textContent = room.rules.name;
+  const changes = ruleChanges(room.rules);
+  document.querySelector('#room-rules')!.textContent =
+    `${room.rules.name}${changes.length ? ` · ${changes.length} custom` : ''}`;
+  document.querySelector('#room-rules')!.classList.toggle('has-changes', changes.length > 0);
+  setHTML(
+    '.game-tools [data-do="table-settings"]',
+    `${icon('settings')}${changes.length ? `<b class="rule-change-count" aria-hidden="true">${changes.length}</b>` : ''}`,
+  );
+  document
+    .querySelector('.game-tools [data-do="table-settings"]')!
+    .setAttribute(
+      'aria-description',
+      changes.length
+        ? `${changes.length} rules modified from ${PRESETS[room.rules.preset].name}`
+        : 'Preset rules',
+    );
   document.querySelector('#room-code')!.textContent = room.code;
   if (g) {
     table?.update(g);
     renderGame(g);
+    if (activeDialog === 'editor' && editorContext === 'room') showTableSettings();
   } else renderWaiting();
+  if (activeDialog === 'table-settings' && settingsSignature !== currentSettingsSignature())
+    showTableSettings();
 }
+function canConfigureTable() {
+  return (
+    !!state?.room &&
+    !state.room.game &&
+    (state.room.host === state.profile.id || state.lobby.host === state.profile.id)
+  );
+}
+function ruleRibbon(r: Rules) {
+  const keys: (keyof Rules)[] = ['minimum', 'claimSeconds', 'turnSeconds'];
+  const changes = ruleChanges(r);
+  return `<div class="rule-ribbon" aria-label="Rules overview">${[...new Set([...keys, ...changes])].map((key) => `<span class="rule-chip ${changes.includes(key) ? 'modified' : ''}" title="${esc(ruleLabels[key])}: ${esc(ruleValue(r, key))}"><small>${esc(ruleLabels[key])}</small><b>${esc(ruleValue(r, key))}</b>${changes.includes(key) ? '<i aria-label="Modified from preset">●</i>' : ''}</span>`).join('')}</div>`;
+}
+function markRuleEdits() {
+  const changes = ruleChanges(editing!);
+  modal
+    .querySelectorAll<HTMLInputElement | HTMLSelectElement>('#rules-form [name]')
+    .forEach((input) => {
+      const changed = changes.includes(input.name as keyof Rules);
+      input.closest('label')?.classList.toggle('modified-field', changed);
+    });
+}
+function audioSettingsHTML() {
+  return `<div class="audio-settings"><button class="icon-button" data-do="sound" aria-label="${sound ? 'Mute game sounds' : 'Enable game sounds'}">${icon(sound ? 'sound' : 'mute')}</button><label for="sound-volume">Sound volume</label><input id="sound-volume" type="range" min="0" max="100" value="${Math.round(soundVolume * 100)}" aria-label="Sound volume"/></div>`;
+}
+function showTableSettings() {
+  settingsSignature = currentSettingsSignature();
+  editorTab = 0;
+  const r = state!.room!.rules;
+  if (canConfigureTable()) {
+    editorContext = 'room';
+    editing = structuredClone(r);
+    renderEditor();
+    return;
+  }
+  const changes = ruleChanges(r);
+  openDialog(
+    'table-settings',
+    'Table rules',
+    `<p class="settings-status">${state!.room!.game ? 'Locked for this match' : 'Configured by the table or lobby host'} · ${esc(PRESETS[r.preset].name)}</p>${ruleRibbon(r)}<div class="rule-readout">${activeRuleKeys(
+      r,
+    )
+      .map(
+        (key) =>
+          `<div class="${changes.includes(key) ? 'modified' : ''}"><span>${esc(ruleLabels[key])}</span><strong>${esc(ruleValue(r, key))}</strong></div>`,
+      )
+      .join(
+        '',
+      )}</div>${audioSettingsHTML()}<button class="button outline full" data-do="save-table-rules">${icon('copy')} Save a copy to my rulesets</button>`,
+    true,
+  );
+}
+function meldsHTML(g: GameView) {
+  const me = g.players[g.seat];
+  return (
+    me.melds
+      .map(
+        (m) =>
+          `<div class="exposed-meld meld-${m.kind}"><small><b aria-hidden="true">${{ pung: '碰', chow: '吃', kong: '槓' }[m.kind]}</b>${m.concealed ? 'closed ' : ''}${m.kind}</small><div class="meld-tiles">${[
+            ...m.tiles,
+          ]
+            .sort((a, b) => a - b)
+            .map((t) => tileStatic(t, 'mini'))
+            .join('')}</div></div>`,
+      )
+      .join('') +
+    (me.bonuses.length
+      ? `<div class="exposed-meld meld-bonus"><small><b aria-hidden="true">花</b>bonus</small><div class="meld-tiles">${[
+          ...me.bonuses,
+        ]
+          .sort((a, b) => a - b)
+          .map((t) => tileStatic(t, 'mini'))
+          .join('')}</div></div>`
+      : '')
+  );
+}
+function handDetailHTML(g: GameView) {
+  const me = g.players[g.seat],
+    insight = handInsight(me.hand, me.melds);
+  const max = Math.max(1, ...insight.suits);
+  return `<div class="hand-overview"><div class="hand-route"><span>${insight.closed ? '門 CLOSED' : '副 OPEN'}</span><h3>${insight.route}</h3></div><div class="set-slots" aria-label="${insight.locked} declared melds of four">${Array.from({ length: 4 }, (_, i) => `<span class="${i < insight.locked ? 'filled' : ''}">${i < insight.locked ? { pung: '碰', chow: '吃', kong: '槓' }[me.melds[i].kind] : '—'}<small>${i < insight.locked ? me.melds[i].kind : 'set'}</small></span>`).join('')}<span class="pair-slot">対<small>pair</small></span></div><p class="field-help">Declared sets are filled. Complete concealed sets and special hands are checked when you win.</p><div class="detail-rack">${me.hand.map((t) => tileStatic(t)).join('')}</div><div class="detail-melds">${meldsHTML(g)}</div><div class="suit-bars">${['Characters 萬', 'Circles 筒', 'Bamboo 索', 'Honors 字'].map((label, i) => `<div><span>${label}</span><i style="--fill:${(insight.suits[i] / max) * 100}%"></i><b>${insight.suits[i]}</b></div>`).join('')}</div>${insight.pairs.length ? `<div class="pair-candidates"><span>Pair candidates</span>${insight.pairs.map((t) => tileStatic(t, 'mini')).join('')}</div>` : ''}<p class="field-help">Tile composition, not a scoring prediction. Candidate pairs may also form chows or pungs.</p></div>`;
+}
+function showHandDetail() {
+  const g = state?.room?.game;
+  if (g)
+    openDialog(
+      'hand-detail',
+      'Your hand',
+      `<div id="hand-detail-body">${handDetailHTML(g)}</div>`,
+      true,
+    );
+}
+function renderLastActions(g: GameView) {
+  const discard = [...g.events].reverse().find((e) => e.type === 'discard');
+  const action = [...g.events].reverse().find((e) => e.seat !== undefined && e.type !== 'info');
+  setHTML(
+    '#recent-actions',
+    `<div class="last-action last-discard"><div><small>LAST DISCARD</small><strong>${discard ? esc(g.players[discard.seat!].profile.name) : 'Waiting for a discard'}</strong></div>${discard?.tile !== undefined ? tileStatic(discard.tile, 'mini') : '<span class="action-placeholder">打</span>'}</div><div class="last-action last-turn" role="status"><span class="action-symbol" aria-hidden="true">${action ? { draw: '摸', discard: '打', claim: '鳴', win: '和', bonus: '花', info: '風' }[action.type] : '風'}</span><div><small>LAST TURN</small><strong>${action ? esc(action.text) : 'Tiles dealt. East begins.'}</strong></div></div>`,
+  );
+}
+
 function avatarHTML(name: string, color: string, bot = false) {
   return `<span class="avatar ${color}">${bot ? icon('bot') : esc(name.slice(0, 1).toUpperCase())}</span>`;
 }
@@ -362,8 +469,9 @@ function renderWaiting() {
   document.querySelector<HTMLElement>('#playing-controls')!.hidden = true;
   document.querySelector<HTMLElement>('#waiting-controls')!.hidden = false;
   document.querySelector<HTMLElement>('#discard-inspector')!.hidden = true;
+  setHTML('#recent-actions', '');
   document.querySelector('#waiting-controls')!.innerHTML =
-    `<div class="waiting-actions">${room.host === state!.profile.id ? `<button class="button outline" data-do="fill-bots" ${room.players.length === 4 ? 'disabled' : ''}>${icon('bot')} Fill seats with bots</button><button class="button primary" data-do="start" ${room.players.length < 4 ? 'disabled' : ''}>Start the game ${icon('arrow')}</button>` : `<span>Waiting for the host to start the hand.</span>`}<button class="text-button" data-do="share-room">${icon('copy')} Copy invitation</button></div>`;
+    `<div class="waiting-rules">${ruleRibbon(room.rules)}<button class="text-button" data-do="table-settings">${icon('settings')} ${canConfigureTable() ? 'Configure table' : 'Table rules'}</button></div><div class="waiting-actions">${room.host === state!.profile.id ? `<button class="button outline" data-do="fill-bots" ${room.players.length === 4 ? 'disabled' : ''}>${icon('bot')} Fill seats with bots</button><button class="button primary" data-do="start" ${room.players.length < 4 ? 'disabled' : ''}>Start the game ${icon('arrow')}</button>` : `<span>Waiting for the host to start the hand.</span>`}<button class="text-button" data-do="share-room">${icon('copy')} Copy invitation</button></div>`;
   document.querySelector('#table-sidebar')!.innerHTML = tableInfoHTML(room.rules);
   document.querySelector('#log-entries')!.innerHTML =
     '<p class="log-empty">Waiting for the first deal.</p>';
@@ -433,27 +541,14 @@ function renderGame(g: GameView) {
     discardable,
     selected,
   );
+  const insight = handInsight(me.hand, me.melds);
   setHTML(
-    '#exposed-hand',
-    `${me.melds
-      .map(
-        (m) =>
-          `<div class="exposed-meld"><small>${m.concealed ? 'closed ' : ''}${m.kind}</small>${[
-            ...m.tiles,
-          ]
-            .sort((a, b) => a - b)
-            .map((t) => tileStatic(t, 'mini'))
-            .join('')}</div>`,
-      )
-      .join('')}${
-      me.bonuses.length
-        ? `<div class="exposed-meld"><small>flowers & bonuses</small>${[...me.bonuses]
-            .sort((a, b) => a - b)
-            .map((t) => tileStatic(t, 'mini'))
-            .join('')}</div>`
-        : ''
-    }`,
+    '#hand-shape',
+    `<span class="meld-meter" aria-hidden="true">${Array.from({ length: 4 }, (_, i) => `<i class="${i < insight.locked ? 'filled' : ''}"></i>`).join('')}</span><span>${insight.locked}/4 melds</span><b>${insight.route}</b>`,
   );
+  setHTML('#exposed-hand', meldsHTML(g));
+  renderLastActions(g);
+  if (activeDialog === 'hand-detail') setHTML('#hand-detail-body', handDetailHTML(g));
   setHTML(
     '#action-dock',
     `<div class="action-bar ${isClaim ? 'claim-active' : ''}"><div class="action-context">${isClaim ? `${tileStatic(g.claim!.tile, 'claim-tile')}<div><strong>${g.claim?.submitted ? 'CALL LOCKED IN' : g.actions.length ? 'MAKE YOUR CALL' : 'CLAIM PENDING'}</strong><small>${esc(g.players[g.claim!.from].profile.name)} ${g.claim!.reason === 'discard' ? 'discarded' : 'declared a kong'} · <b data-countdown="${g.claim!.deadline}"></b></small></div>` : myTurn ? `<span class="turn-seal">打</span><div><strong>${blocked ? 'MORE FAN NEEDED' : g.actions.some((a) => a.kind === 'win') ? 'WINNING HAND' : 'CHOOSE YOUR DISCARD'}</strong><small>${blocked ? `${assessment!.qualifying} of ${assessment!.minimum} qualifying fan · flowers do not qualify` : 'Select a tile, then discard'} <b data-countdown="${g.turnDeadline}"></b></small></div>` : `<span class="turn-seal">${g.phase === 'ended' || g.phase === 'finished' ? '和' : '風'}</span><div><strong>${g.phase === 'ended' || g.phase === 'finished' ? 'HAND COMPLETE' : 'TABLE IN PLAY'}</strong><small>${isClaim ? 'Resolving calls' : 'Arrange your tiles while you wait'}</small></div>`}</div><div class="action-buttons">${specials.map((a) => `<button class="button ${a.kind === 'win' ? 'gold win-action' : 'primary'}" data-action="${a.id}">${a.tiles.length && a.kind !== 'win' ? a.tiles.map((t) => tileStatic(t, 'tiny')).join('') : a.kind === 'win' ? '<span class="action-glyph">和</span>' : ''}<span>${esc(a.label)}</span></button>`).join('')}${isClaim && g.actions.some((a) => a.kind === 'pass') ? '<button class="button outline" data-action="pass">Pass</button>' : ''}${g.actions.some((a) => a.kind === 'riichi') ? `<button class="button ${riichiMode ? 'primary' : 'outline'}" data-do="riichi">${riichiMode ? 'Cancel riichi' : 'Declare riichi'}</button>` : ''}${myTurn ? `<button class="button primary discard-button" data-do="discard" ${selected === null ? 'disabled' : ''}>${selected !== null ? `${riichiMode ? 'Riichi · ' : ''}Discard ${esc(tileName(selected))}` : 'Select a tile'} ${icon('arrow')}</button>` : g.phase === 'ended' ? `<button class="button primary" data-do="ready" ${me.ready ? 'disabled' : ''}>${me.ready ? 'Ready · waiting' : 'Ready for the next hand'} ${icon('arrow')}</button>` : g.phase === 'finished' && state!.room!.host === state!.profile.id ? `<button class="button primary" data-do="rematch">Play another match ${icon('arrow')}</button>` : ''}</div>${isClaim ? `<div class="claim-time-bar"><i data-progress="${g.claim!.deadline}" data-duration="${g.rules.claimSeconds * 1000}"></i></div>` : ''}</div>`,
@@ -576,12 +671,14 @@ function updateClocks() {
 setInterval(updateClocks, 150);
 
 function openDialog(name: string, title: string, body: string, wide = false) {
+  hideTileTooltip();
   activeDialog = name;
   modal.className = wide ? 'wide-dialog' : '';
   modal.innerHTML = `<div class="dialog-heading"><div><span class="eyebrow">FOUR WINDS</span><h2>${title}</h2></div><button class="icon-button" data-do="close" aria-label="Close dialog">${icon('close')}</button></div>${body}`;
   if (!modal.open) modal.showModal();
 }
 function closeDialog() {
+  hideTileTooltip();
   modal.close();
   activeDialog = '';
 }
@@ -600,12 +697,40 @@ function ruleOptions(selectedId = 'singapore') {
     )
     .join('');
 }
-function showCreate(preset = 'singapore', practice = false) {
+let createDraft: { name: string; rules: Rules; bots: boolean; practice: boolean } | null = null;
+function showCreate(preset = 'singapore', practice = false, restore = false) {
+  if (!restore || !createDraft)
+    createDraft = {
+      name: practice ? 'A quiet practice hand' : `${state?.profile.name ?? 'Our'}’s table`,
+      rules: structuredClone(
+        state?.rulesets.find((r) => r.id === preset) ?? PRESETS[preset as Preset],
+      ),
+      bots: practice,
+      practice,
+    };
+  const draft = createDraft;
+  const customOption = [...Object.values(PRESETS), ...(state?.rulesets ?? [])].some(
+    (r) => r.id === draft.rules.id,
+  )
+    ? ''
+    : `<option value="${esc(draft.rules.id)}" selected>${esc(draft.rules.name)} · custom</option>`;
   openDialog(
     'create',
-    practice ? 'A table just for you.' : 'Make room for a good game.',
-    `<p class="dialog-intro">${practice ? 'Three friendly bots are ready. Friends can take their seats whenever they join.' : 'Invite friends with a room code. Every empty seat can have a bot until a friend arrives.'}</p><form id="create-form"><label>TABLE NAME<input name="name" maxlength="24" value="${esc(practice ? 'A quiet practice hand' : `${state?.profile.name ?? 'Our'}’s table`)}" required/></label><label>RULESET<select name="rules" aria-label="RULESET">${ruleOptions(preset)}</select></label><label class="check-row"><input type="checkbox" name="bots" ${practice ? 'checked' : ''}/><span><strong>Fill empty seats with bots</strong><small>Start immediately. Joining friends replace bots.</small></span>${icon('bot')}</label><div class="form-note">${icon('leaf')} ${esc(state?.lobby.name ?? 'The Four Winds Club')} · Fake chips only</div><button class="button primary full" type="submit">${practice ? 'Take your seat' : 'Create table'} ${icon('arrow')}</button></form>`,
+    'Create table',
+    `<form id="create-form"><label>TABLE NAME<input name="name" maxlength="24" value="${esc(draft.name)}" required/></label><label>RULESET<select name="rules" aria-label="RULESET">${ruleOptions(draft.rules.id)}${customOption}</select></label><div id="create-rules-preview">${ruleRibbon(draft.rules)}</div><button type="button" class="button outline full" data-do="create-settings">${icon('settings')} Configure rules</button><label class="check-row"><input type="checkbox" name="bots" ${draft.bots ? 'checked' : ''}/><span><strong>Fill empty seats with bots</strong><small>Start immediately. Friends can take their seats.</small></span>${icon('bot')}</label><div class="form-note">${esc(state?.lobby.name ?? 'Four Winds')} · Fake chips only</div><button class="button primary full" type="submit">${draft.practice ? 'Take your seat' : 'Create table'} ${icon('arrow')}</button></form>`,
   );
+}
+function captureCreateDraft() {
+  const form = document.querySelector<HTMLFormElement>('#create-form');
+  if (!form || !createDraft) return;
+  const data = new FormData(form);
+  createDraft.name = String(data.get('name'));
+  createDraft.bots = data.has('bots');
+  const id = String(data.get('rules'));
+  if (id !== createDraft.rules.id)
+    createDraft.rules = structuredClone(
+      state?.rulesets.find((r) => r.id === id) ?? PRESETS[id as Preset],
+    );
 }
 function showJoin() {
   openDialog(
@@ -668,11 +793,30 @@ function ruleCard(r: Rules, base: boolean) {
   return `<article class="saved-rule"><span class="eyebrow">${base ? 'PRESET' : esc(PRESET_DETAILS[r.preset].region) + ' · HOUSE RULES'}</span><h3>${esc(r.name)}</h3><p>${base ? PRESET_DETAILS[r.preset].source : `${r.minimum} minimum · ${r.claimSeconds}s claims · ${r.houseBonuses.length} custom bonuses`}</p><div><button class="text-button" data-edit="${esc(r.id)}">${base ? 'Customize' : 'Edit rules'} ${icon('settings')}</button><button class="circle-arrow" data-preset="${esc(r.id)}" aria-label="Play ${esc(r.name)}">${icon('arrow')}</button></div></article>`;
 }
 let editing: Rules | null = null;
+let editorContext: 'saved' | 'create' | 'room' = 'saved';
+let editorTab = 0;
+let settingsSignature = '';
+function currentSettingsSignature() {
+  return JSON.stringify([state?.room?.rules, !!state?.room?.game, canConfigureTable()]);
+}
+function selectRuleTab(index: number) {
+  editorTab = index;
+  modal.querySelectorAll<HTMLFieldSetElement>('#rules-form fieldset').forEach((section, i) => {
+    section.hidden = i !== index;
+  });
+  modal.querySelectorAll<HTMLElement>('[data-rule-tab]').forEach((button, i) => {
+    button.setAttribute('aria-selected', String(i === index));
+    button.tabIndex = i === index ? 0 : -1;
+  });
+}
+
 const numberField = (key: keyof Rules, label: string, min: number, max: number, step = 1) =>
   `<label>${label}<input name="${key}" type="number" min="${min}" max="${max}" step="${step}" value="${editing![key]}" required/></label>`;
 const toggle = (key: keyof Rules, label: string, help: string) =>
   `<label class="check-row compact"><input type="checkbox" name="${key}" ${editing![key] ? 'checked' : ''}/><span><strong>${label}</strong><small>${help}</small></span></label>`;
 function showEditor(id: string) {
+  editorContext = 'saved';
+  editorTab = 0;
   editing = structuredClone(
     id === 'new'
       ? PRESETS.singapore
@@ -688,8 +832,12 @@ function renderEditor() {
   const r = editing!;
   openDialog(
     'editor',
-    'Your table, your way.',
-    `<form id="rules-form"><div class="form-grid"><label>RULESET NAME<input name="name" maxlength="40" value="${esc(r.name)}" required/></label><label>BASED ON<select id="editor-preset" name="preset">${Object.values(
+    editorContext === 'room'
+      ? 'Table settings'
+      : editorContext === 'create'
+        ? 'Configure your table'
+        : 'Your ruleset',
+    `<form id="rules-form"><div id="editor-preview" class="editor-preview">${ruleRibbon(r)}</div><div class="form-grid"><label>RULESET NAME<input name="name" maxlength="40" value="${esc(r.name)}" required/></label><label>BASED ON<select id="editor-preset" name="preset">${Object.values(
       PRESETS,
     )
       .map(
@@ -698,9 +846,32 @@ function renderEditor() {
       )
       .join(
         '',
-      )}</select></label></div><fieldset><legend>The pace of play</legend><div class="form-grid three">${numberField('rounds', 'WINDS / ROUNDS', 1, 4)}${numberField('claimSeconds', 'CLAIM WINDOW (SECONDS)', 3, 30)}${numberField('turnSeconds', 'TURN CLOCK (SECONDS)', 10, 120)}</div><label>MELD CALL PRIORITY<select name="meldPriority"><option value="pung-first" ${r.meldPriority === 'pung-first' ? 'selected' : ''}>Pung & kong, then chow</option><option value="equal" ${r.meldPriority === 'equal' ? 'selected' : ''}>Equal · earliest valid click</option><option value="chow-first" ${r.meldPriority === 'chow-first' ? 'selected' : ''}>Chow, then pung & kong</option></select><small>Wins always come first. Earliest server-received click breaks ties.</small></label>${toggle('allowChow', 'Allow chows / chis', 'Sequences can be called from the preceding player.')}${toggle('allowKong', 'Allow kongs / kans', 'Four of a kind can be declared for a replacement tile.')}${toggle('sevenPairs', 'Allow seven pairs', 'Enable the seven-pair winning shape.')}${r.preset !== 'mcr' ? toggle('dealerRepeats', 'Dealer continuations', r.preset === 'singapore' ? 'Repeat a drawn hand if there were no kongs.' : 'Repeat after a dealer win or dealer tenpai draw.') : ''}</fieldset><fieldset><legend>Scoring & play points</legend><div class="form-grid">${numberField('minimum', `MINIMUM ${r.preset === 'riichi' ? 'HAN' : r.preset === 'singapore' ? 'TAI' : 'FAN'}`, r.preset === 'riichi' ? 1 : 0, r.preset === 'riichi' ? 13 : r.preset === 'singapore' ? 12 : 88)}${numberField('scoreMultiplier', 'POINT MULTIPLIER', 1, 10)}${numberField('startingPoints', 'STARTING POINTS', 0, 100000)}</div>${toggle('points', 'Track point totals', 'Keep a cumulative point balance across hands. Winning thresholds still apply when off.')}${r.preset === 'riichi' ? `${toggle('openTanyao', 'Open all simples', 'Allow tanyao in an open hand.')}${toggle('kiriage', 'Round up to mangan', '4 han / 30 fu and 3 han / 60 fu become mangan (EMA 2025).')}${toggle('uraDora', 'Ura dora', 'Reveal extra indicators for a winning riichi hand.')}` : ''}${r.preset === 'singapore' ? `<div class="form-grid">${numberField('taiCap', 'TAI CAP', 1, 12)}${numberField('sgBase', 'BASE POINT UNIT', 1, 100)}${numberField('sgSelfDraw', 'SELF-DRAW PAYMENT FACTOR', 1, 4)}${numberField('sgBonusUnit', 'INSTANT BONUS UNIT', 1, 100)}</div>${toggle('sgAnimals', 'Include animal tiles', 'Cat, rat, rooster, and centipede. Each adds tai.')}${toggle('sgFlowers', 'Include flowers & seasons', 'Eight bonus tiles, seat flowers, and flower wins.')}${toggle('sgInstantBonuses', 'Immediate bonus payments', 'Animal pairs, own flower pairs, full bonus sets, and open/added kongs.')}` : ''}</fieldset><fieldset><legend>Fake chips</legend>${toggle('chips', 'Play with fake chips', 'A separate ledger for fun, with no monetary value.')}<div class="form-grid">${numberField('startingChips', 'STARTING CHIPS', 0, 1000000)}${numberField('chipsPerPoint', 'FAKE CHIPS PER POINT', 0.001, 1000, 0.001)}</div></fieldset><fieldset><legend>Custom house bonuses</legend><p class="field-help">Add an executable scoring condition. ${r.preset === 'riichi' ? 'Bonuses are flat points after official han/fu scoring; they cannot create a yaku.' : `Bonuses add ${r.preset === 'mcr' ? 'fan' : 'tai'} and count toward the minimum.`}</p><div id="bonus-editor">${r.houseBonuses.map((b, i) => bonusRow(b, i)).join('')}</div><button type="button" class="text-button" data-do="add-bonus">${icon('plus')} Add a bonus</button></fieldset><div class="form-note">${icon('book')} Saving makes a house ruleset. Existing tables keep the rules they started with.</div><button class="button primary full">Save ruleset ${icon('check')}</button></form>`,
+      )}</select></label></div><fieldset><legend>The pace of play</legend><div class="form-grid three">${numberField('rounds', 'WINDS / ROUNDS', 1, 4)}${numberField('claimSeconds', 'CLAIM WINDOW (SECONDS)', 3, 30)}${numberField('turnSeconds', 'TURN CLOCK (SECONDS)', 10, 120)}</div><label>MELD CALL PRIORITY<select name="meldPriority"><option value="pung-first" ${r.meldPriority === 'pung-first' ? 'selected' : ''}>Pung & kong, then chow</option><option value="equal" ${r.meldPriority === 'equal' ? 'selected' : ''}>Equal · earliest valid click</option><option value="chow-first" ${r.meldPriority === 'chow-first' ? 'selected' : ''}>Chow, then pung & kong</option></select><small>Wins always come first. Earliest server-received click breaks ties.</small></label>${toggle('allowChow', 'Allow chows / chis', 'Sequences can be called from the preceding player.')}${toggle('allowKong', 'Allow kongs / kans', 'Four of a kind can be declared for a replacement tile.')}${toggle('sevenPairs', 'Allow seven pairs', 'Enable the seven-pair winning shape.')}${r.preset !== 'mcr' ? toggle('dealerRepeats', 'Dealer continuations', r.preset === 'singapore' ? 'Repeat a drawn hand if there were no kongs.' : 'Repeat after a dealer win or dealer tenpai draw.') : ''}</fieldset><fieldset><legend>Scoring & play points</legend><div class="form-grid">${numberField('minimum', `MINIMUM ${r.preset === 'riichi' ? 'HAN' : r.preset === 'singapore' ? 'TAI' : 'FAN'}`, r.preset === 'riichi' ? 1 : 0, r.preset === 'riichi' ? 13 : r.preset === 'singapore' ? 12 : 88)}${numberField('scoreMultiplier', 'POINT MULTIPLIER', 1, 10)}${numberField('startingPoints', 'STARTING POINTS', 0, 100000)}</div>${toggle('points', 'Track point totals', 'Keep a cumulative point balance across hands. Winning thresholds still apply when off.')}${r.preset === 'riichi' ? `${toggle('openTanyao', 'Open all simples', 'Allow tanyao in an open hand.')}${toggle('kiriage', 'Round up to mangan', '4 han / 30 fu and 3 han / 60 fu become mangan (EMA 2025).')}${toggle('uraDora', 'Ura dora', 'Reveal extra indicators for a winning riichi hand.')}` : ''}${r.preset === 'singapore' ? `<div class="form-grid">${numberField('taiCap', 'TAI CAP', 1, 12)}${numberField('sgBase', 'BASE POINT UNIT', 1, 100)}${numberField('sgSelfDraw', 'SELF-DRAW PAYMENT FACTOR', 1, 4)}${numberField('sgBonusUnit', 'INSTANT BONUS UNIT', 1, 100)}</div>${toggle('sgAnimals', 'Include animal tiles', 'Cat, rat, rooster, and centipede. Each adds tai.')}${toggle('sgFlowers', 'Include flowers & seasons', 'Eight bonus tiles, seat flowers, and flower wins.')}${toggle('sgInstantBonuses', 'Immediate bonus payments', 'Animal pairs, own flower pairs, full bonus sets, and open/added kongs.')}` : ''}</fieldset><fieldset><legend>Fake chips</legend>${toggle('chips', 'Play with fake chips', 'A separate ledger for fun, with no monetary value.')}<div class="form-grid">${numberField('startingChips', 'STARTING CHIPS', 0, 1000000)}${numberField('chipsPerPoint', 'FAKE CHIPS PER POINT', 0.001, 1000, 0.001)}</div></fieldset><fieldset><legend>Custom house bonuses</legend><p class="field-help">Add an executable scoring condition. ${r.preset === 'riichi' ? 'Bonuses are flat points after official han/fu scoring; they cannot create a yaku.' : `Bonuses add ${r.preset === 'mcr' ? 'fan' : 'tai'} and count toward the minimum.`}</p><div id="bonus-editor">${r.houseBonuses.map((b, i) => bonusRow(b, i)).join('')}</div><button type="button" class="text-button" data-do="add-bonus">${icon('plus')} Add a bonus</button></fieldset><div class="editor-footer"><span class="field-help">${editorContext === 'room' ? 'Shared with every seat · locks on first deal' : editorContext === 'create' ? 'Applies to your new table' : 'Saved with your profile'}</span><button class="button primary full">${editorContext === 'room' ? 'Apply table rules' : editorContext === 'create' ? 'Use these rules' : 'Save ruleset'} ${icon('check')}</button></div></form>`,
     true,
   );
+  const sections = [...modal.querySelectorAll<HTMLFieldSetElement>('#rules-form fieldset')];
+  sections[0].insertAdjacentHTML(
+    'beforebegin',
+    `<div class="rule-tabs" role="tablist" aria-label="Rules sections">${[
+      ['風', 'Play'],
+      ['和', 'Scoring'],
+      ['●', 'Chips'],
+      ['花', 'Bonuses'],
+    ]
+      .map(
+        ([glyph, label], i) =>
+          `<button type="button" role="tab" id="rule-tab-${i}" data-rule-tab="${i}" aria-controls="rule-section-${i}"><span aria-hidden="true">${glyph}</span>${label}<i class="tab-change" aria-label="Modified" hidden>●</i></button>`,
+      )
+      .join('')}</div>`,
+  );
+  sections.forEach((section, i) => {
+    section.id = `rule-section-${i}`;
+    section.setAttribute('role', 'tabpanel');
+    section.setAttribute('aria-labelledby', `rule-tab-${i}`);
+  });
+  selectRuleTab(editorTab);
+  markRuleEdits();
+  modal.querySelector('.dialog-heading')!.insertAdjacentHTML('afterend', audioSettingsHTML());
 }
 function bonusRow(b: Rules['houseBonuses'][0], i: number) {
   return `<div class="bonus-row"><input name="bonusName${i}" placeholder="Bonus name" aria-label="Bonus name" value="${esc(b.name)}" maxlength="30" required/><select name="bonusCondition${i}" aria-label="Bonus condition">${['self-draw', 'closed', 'all-pungs', 'full-flush'].map((c) => `<option value="${c}" ${b.condition === c ? 'selected' : ''}>${c.replaceAll('-', ' ')}</option>`).join('')}</select><input name="bonusPoints${i}" type="number" min="1" max="100" value="${b.points}" aria-label="Bonus amount" required/><button type="button" class="icon-button" data-remove-bonus="${i}" aria-label="Remove bonus">${icon('close')}</button></div>`;
@@ -793,6 +964,10 @@ app.addEventListener('click', async (e) => {
       riichiMode = false;
       return;
     }
+    if (button.dataset.ruleTab !== undefined) {
+      selectRuleTab(Number(button.dataset.ruleTab));
+      return;
+    }
     if (button.dataset.removeBonus !== undefined) {
       readRulesForm();
       editing!.houseBonuses.splice(Number(button.dataset.removeBonus), 1);
@@ -800,6 +975,23 @@ app.addEventListener('click', async (e) => {
       return;
     }
     switch (button.dataset.do) {
+      case 'table-settings':
+        showTableSettings();
+        break;
+      case 'create-settings':
+        captureCreateDraft();
+        editing = structuredClone(createDraft!.rules);
+        editorContext = 'create';
+        editorTab = 0;
+        renderEditor();
+        break;
+      case 'save-table-rules':
+        await command('save-rules', { ...state!.room!.rules, id: requestId() });
+        toast('Table rules saved to your profile.');
+        break;
+      case 'hand-detail':
+        showHandDetail();
+        break;
       case 'sort':
         rack?.sort();
         break;
@@ -879,8 +1071,12 @@ app.addEventListener('click', async (e) => {
         break;
       case 'sound':
         sound = !sound;
-        button.innerHTML = icon(sound ? 'sound' : 'mute');
-        button.setAttribute('aria-label', sound ? 'Mute game sounds' : 'Enable game sounds');
+        localStorage.setItem('four-winds-sound', sound ? 'on' : 'off');
+        gameAudio.configure(sound, soundVolume);
+        document.querySelectorAll('[data-do="sound"]').forEach((b) => {
+          b.innerHTML = icon(sound ? 'sound' : 'mute');
+          b.setAttribute('aria-label', sound ? 'Mute game sounds' : 'Enable game sounds');
+        });
         tone();
         break;
       case 'riichi':
@@ -934,7 +1130,44 @@ app.addEventListener('click', async (e) => {
 function showHelp() {
   openDialog('help', 'A little table wisdom.', helpBody(state?.room?.rules), true);
 }
+modal.addEventListener('keydown', (e) => {
+  const tab = (e.target as Element).closest<HTMLElement>('[data-rule-tab]');
+  if (!tab || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
+  e.preventDefault();
+  const next =
+    e.key === 'Home' ? 0 : e.key === 'End' ? 3 : (editorTab + (e.key === 'ArrowRight' ? 1 : 3)) % 4;
+  selectRuleTab(next);
+  modal.querySelector<HTMLElement>(`[data-rule-tab="${next}"]`)!.focus();
+});
+modal.addEventListener(
+  'invalid',
+  (e) => {
+    const section = (e.target as HTMLElement).closest<HTMLFieldSetElement>(
+      'fieldset[role="tabpanel"]',
+    );
+    if (section) selectRuleTab(Number(section.id.replace('rule-section-', '')));
+  },
+  true,
+);
+modal.addEventListener('input', (e) => {
+  const target = e.target as HTMLInputElement;
+  if (target.id === 'sound-volume') {
+    soundVolume = Number(target.value) / 100;
+    localStorage.setItem('four-winds-volume', String(soundVolume));
+    gameAudio.configure(sound, soundVolume);
+  }
+  if (target.closest('#rules-form') && target.id !== 'editor-preset') {
+    readRulesForm();
+    markRuleEdits();
+    setHTML('#editor-preview', ruleRibbon(editing!));
+  }
+});
 modal.addEventListener('change', (e) => {
+  if ((e.target as HTMLInputElement).name === 'rules') {
+    captureCreateDraft();
+    setHTML('#create-rules-preview', ruleRibbon(createDraft!.rules));
+  }
+  if ((e.target as HTMLElement).id === 'sound-volume') tone('claim');
   if ((e.target as HTMLElement).id === 'editor-preset') {
     const p = (e.target as HTMLSelectElement).value as Preset;
     const id = editing!.id;
@@ -952,9 +1185,12 @@ modal.addEventListener('submit', async (e) => {
   try {
     switch (form.id) {
       case 'create-form': {
-        const id = String(data.get('rules')),
-          rules = state?.rulesets.find((r) => r.id === id) ?? PRESETS[id as Preset];
-        await command('create', { name: data.get('name'), rules, bots: data.has('bots') });
+        captureCreateDraft();
+        await command('create', {
+          name: createDraft!.name,
+          rules: createDraft!.rules,
+          bots: createDraft!.bots,
+        });
         break;
       }
       case 'join-form':
@@ -971,11 +1207,28 @@ modal.addEventListener('submit', async (e) => {
       case 'join-lobby-form':
         await command('join-lobby', data.get('code'));
         break;
-      case 'rules-form':
+      case 'rules-form': {
         readRulesForm();
-        await command('save-rules', editing);
-        toast('Ruleset saved. Ready for your next table.');
+        const checked = rulesSchema.safeParse(editing);
+        if (!checked.success) {
+          toast(checked.error.issues[0].message, true);
+          if (submit) submit.disabled = false;
+          return;
+        }
+        if (editorContext === 'create') {
+          createDraft!.rules = { ...checked.data, id: requestId() };
+          showCreate('singapore', false, true);
+          return;
+        }
+        if (editorContext === 'room') {
+          await command('configure-rules', checked.data);
+          toast('Table rules updated for every seat.');
+        } else {
+          await command('save-rules', checked.data);
+          toast('Ruleset saved.');
+        }
         break;
+      }
     }
     closeDialog();
   } catch {

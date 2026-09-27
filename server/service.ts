@@ -264,6 +264,19 @@ export class GameService {
       if (data.bots) r.game = startGame(r.rules, r.players, -1);
       return { code };
     }
+    if (type === 'configure-rules') {
+      const r = requireRoom();
+      if (r.host !== s.profile.id && this.lobbies.get(r.lobby)?.host !== s.profile.id)
+        throw new Error('Only the table or lobby host can configure rules.');
+      if (r.game) throw new Error('Rules are locked after the first deal.');
+      const rules = rulesSchema.parse(input);
+      r.rules = rules;
+      for (const player of r.players) {
+        player.points = rules.startingPoints;
+        player.chips = rules.startingChips;
+      }
+      return {};
+    }
     if (type === 'join') {
       const code = z
         .string()

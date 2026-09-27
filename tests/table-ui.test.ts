@@ -1,6 +1,40 @@
 import { describe, expect, it } from 'vitest';
 import { reconcileOrder, moveTile } from '../client/hand-rack';
 import { summarizeDiscards } from '../client/discards';
+import { handInsight } from '../client/hand-insight';
+import { ruleChanges } from '../shared/rule-summary';
+import { PRESETS } from '../shared/rules';
+
+it('describes concealed ingredients and declared melds without claiming scoring eligibility', () => {
+  const insight = handInsight(
+    [36, 37, 40, 44, 108, 109],
+    [{ kind: 'pung', tiles: [48, 49, 50], concealed: false, from: 2 }],
+  );
+  expect(insight).toEqual({
+    pairs: [36, 108],
+    suits: [0, 7, 0, 2],
+    route: 'One suit + honors',
+    locked: 1,
+    closed: false,
+  });
+  expect(handInsight([0, 36, 72], []).route).toBe('Mixed suits');
+});
+it('marks gameplay changes against the active preset, excluding unrelated variant fields', () => {
+  expect(ruleChanges(PRESETS.mcr)).toEqual([]);
+  expect(
+    ruleChanges({
+      ...PRESETS.mcr,
+      name: 'Friendly',
+      minimum: 0,
+      sgAnimals: false,
+      openTanyao: false,
+    }),
+  ).toEqual(['minimum']);
+  expect(ruleChanges({ ...PRESETS.singapore, sgAnimals: false, chips: true })).toEqual([
+    'chips',
+    'sgAnimals',
+  ]);
+});
 
 describe('local tile order', () => {
   it('keeps manual order as tiles are drawn, discarded, or moved into a meld', () => {

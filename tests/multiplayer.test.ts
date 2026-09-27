@@ -54,6 +54,59 @@ afterEach(async () => {
 });
 
 describe('four-player socket rooms', () => {
+  it('shares pre-deal rules, applies them to balances and the deal, and locks them during play', async () => {
+    const host = await client(),
+      guest = await client();
+    await host.command('create', { name: 'Editable table', rules: PRESETS.mcr, bots: false });
+    await guest.command('join', host.state.room!.code);
+    const rules = {
+      ...structuredClone(PRESETS.singapore),
+      minimum: 0,
+      sgAnimals: false,
+      sgFlowers: false,
+      startingPoints: 500,
+      startingChips: 200,
+      chips: true,
+      claimSeconds: 12,
+    };
+    expect((await guest.command('configure-rules', rules)).ok).toBe(false);
+    expect((await host.command('configure-rules', { ...rules, claimSeconds: -1 })).ok).toBe(false);
+    expect(host.state.room!.rules.preset).toBe('mcr');
+    expect((await host.command('configure-rules', rules)).ok).toBe(true);
+    await flush();
+    expect(guest.state.room!.rules).toEqual(rules);
+    expect(guest.state.room!.players.map((p) => [p.points, p.chips])).toEqual([
+      [500, 200],
+      [500, 200],
+    ]);
+    await host.command('fill-bots');
+    await host.command('start');
+    const game = service.rooms.get(host.state.room!.code)!.game!;
+    expect(game.rules).toEqual(rules);
+    expect(game.players.every((p) => p.hand.every((t) => t < 136) && p.bonuses.length === 0)).toBe(
+      true,
+    );
+    expect(game.wall.every((t) => t < 136)).toBe(true);
+    expect(game.players.every((p) => p.points === 500 && p.chips === 200)).toBe(true);
+    expect((await host.command('configure-rules', PRESETS.riichi)).ok).toBe(false);
+    expect(game.rules).toEqual(rules);
+  });
+  it('allows the containing lobby host to configure a member table, but rejects other members', async () => {
+    const lobbyHost = await client(),
+      tableHost = await client(),
+      guest = await client();
+    await lobbyHost.command('create-lobby', 'Club rules');
+    await tableHost.command('join-lobby', lobbyHost.state.lobby.code);
+    await tableHost.command('create', { name: 'Member table', rules: PRESETS.mcr, bots: false });
+    await lobbyHost.command('join', tableHost.state.room!.code);
+    await guest.command('join', tableHost.state.room!.code);
+    const rules = { ...PRESETS.mcr, minimum: 0, claimSeconds: 5 };
+    expect((await guest.command('configure-rules', rules)).ok).toBe(false);
+    expect((await lobbyHost.command('configure-rules', rules)).ok).toBe(true);
+    await flush();
+    expect(tableHost.state.room!.rules.minimum).toBe(0);
+    expect(guest.state.room!.rules.claimSeconds).toBe(5);
+  });
   it('synchronizes four independent clients, protects hidden tiles, enforces host and turn ownership', async () => {
     const a = await client(),
       b = await client(),

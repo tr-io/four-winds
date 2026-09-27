@@ -19,6 +19,7 @@ test('profile, saved rules, private lobby, four human seats, turn and reconnect'
   await page.getByLabel('RULESET NAME').fill('Evening riichi');
   await page.getByLabel('TURN CLOCK (SECONDS)').fill('120');
   await page.getByLabel('CLAIM WINDOW (SECONDS)').fill('3');
+  await page.getByRole('tab', { name: 'Bonuses', exact: true }).click();
   await page.getByRole('button', { name: 'Add a bonus', exact: true }).click();
   await page.getByRole('textbox', { name: 'Bonus name', exact: true }).fill('A closed hand');
   await page.getByLabel('Bonus condition').selectOption('closed');
@@ -104,4 +105,44 @@ test('mobile bot table, seat takeover, reduced motion and safe profile text', as
   await page.getByRole('button', { name: 'Close dialog' }).click();
   await page.screenshot({ path: 'test-results/mobile-table.png', fullPage: true });
   await ctx.close();
+});
+
+test('create settings, shared waiting-room edits, changed-rule badges, and live rule lock', async ({
+  page,
+  browser,
+}) => {
+  await page.goto('/');
+  await expect(page.locator('#connection-text')).toHaveText('Connected');
+  await page.getByRole('button', { name: 'Create a table', exact: true }).click();
+  await page.getByLabel('TABLE NAME').fill('Custom table');
+  await page.getByRole('button', { name: 'Configure rules', exact: true }).click();
+  await page.getByLabel('BASED ON').selectOption('mcr');
+  await page.getByRole('tab', { name: 'Scoring', exact: true }).click();
+  await page.getByLabel('MINIMUM FAN', { exact: true }).fill('0');
+  await expect(page.locator('[name="minimum"]')).toHaveValue('0');
+  await expect(page.locator('#editor-preview .modified')).toContainText(['Minimum']);
+  await page.getByRole('button', { name: 'Use these rules', exact: true }).click();
+  await expect(page.getByLabel('TABLE NAME')).toHaveValue('Custom table');
+  await expect(page.locator('#create-rules-preview')).toContainText('0 fan');
+  await page.getByRole('button', { name: 'Create table', exact: true }).click();
+  const code = await page.locator('#room-code').innerText();
+  const context = await browser.newContext();
+  const peer = await context.newPage();
+  await peer.goto(`/?room=${code}`);
+  await expect(peer.locator('.waiting-rules')).toContainText('0 fan');
+  await peer.getByRole('button', { name: 'Table settings', exact: true }).click();
+  await expect(peer.locator('#rules-form')).toHaveCount(0);
+  await expect(peer.locator('.rule-readout')).toContainText('0 fan');
+  await page.getByRole('button', { name: 'Table settings', exact: true }).click();
+  await page.getByLabel('CLAIM WINDOW (SECONDS)').fill('12');
+  await page.getByRole('button', { name: 'Apply table rules', exact: true }).click();
+  await expect(peer.locator('.rule-readout')).toContainText('12s');
+  await page.getByRole('button', { name: 'Fill seats with bots', exact: true }).click();
+  await page.getByRole('button', { name: 'Start the game', exact: true }).click();
+  await page.getByRole('button', { name: 'Table settings', exact: true }).click();
+  await expect(page.locator('.settings-status')).toContainText('Locked for this match');
+  await expect(page.locator('#rules-form')).toHaveCount(0);
+  await expect(page.locator('.rule-readout')).toContainText('12s');
+  await page.screenshot({ path: 'test-results/table-settings.png' });
+  await context.close();
 });

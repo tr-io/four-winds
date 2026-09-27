@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import type { GameView } from '../shared/types';
 import { drawTileFace } from './tile-art';
-import { kind } from '../shared/tiles';
+import { kind, tileName } from '../shared/tiles';
+import { hideTileTooltip, showTileTooltip } from './tile-tooltip';
 type Piece = {
   group: THREE.Group;
   face: THREE.Mesh;
@@ -33,6 +34,7 @@ export class MahjongTable {
   private disposed = false;
   private impactAt = -10000;
   private impactStrength = 0;
+  private raycaster = new THREE.Raycaster();
   constructor(
     private container: HTMLElement,
     preview = true,
@@ -54,6 +56,9 @@ export class MahjongTable {
     );
     this.renderer.domElement.setAttribute('role', 'img');
     container.append(this.renderer.domElement);
+    container.addEventListener('pointermove', this.inspectTile);
+    container.addEventListener('pointerup', this.inspectTile);
+    container.addEventListener('pointerleave', hideTileTooltip);
     this.camera = new THREE.PerspectiveCamera(39, 1, 0.1, 100);
     this.camera.position.set(preview ? 8.5 : 0, 15, preview ? 12 : 12);
     this.camera.lookAt(0, 0, preview ? 0 : 0.7);
@@ -199,6 +204,7 @@ export class MahjongTable {
       this.pieces.set(id, p);
     }
     p.face.material = tile === null ? this.back : this.material(tile);
+    p.face.userData.tile = tile;
     if (p.target.distanceToSquared(new THREE.Vector3(x, y, z)) > 0.001) {
       p.from.copy(p.group.position);
       p.born = performance.now();
@@ -352,11 +358,34 @@ export class MahjongTable {
     this.renderer.render(this.scene, this.camera);
     if (moving) this.wake();
   };
+  private inspectTile = (event: PointerEvent) => {
+    if (event.buttons) return;
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    this.raycaster.setFromCamera(
+      new THREE.Vector2(
+        ((event.clientX - rect.left) / rect.width) * 2 - 1,
+        -((event.clientY - rect.top) / rect.height) * 2 + 1,
+      ),
+      this.camera,
+    );
+    // Include backs as occluders. Never inspect a concealed face through another tile.
+    const hit = this.raycaster.intersectObjects(
+      [...this.pieces.values()].map((p) => p.group),
+      true,
+    )[0];
+    const tile = hit?.object.userData.tile;
+    if (typeof tile === 'number') showTileTooltip(tileName(tile), event.clientX, event.clientY);
+    else hideTileTooltip();
+  };
   dispose() {
     this.disposed = true;
     cancelAnimationFrame(this.frame);
     this.motionPreference.removeEventListener('change', this.wake);
     this.observer.disconnect();
+    this.container.removeEventListener('pointermove', this.inspectTile);
+    this.container.removeEventListener('pointerup', this.inspectTile);
+    this.container.removeEventListener('pointerleave', hideTileTooltip);
+    hideTileTooltip();
     this.scene.traverse((o) => {
       if (o instanceof THREE.Mesh) {
         o.geometry.dispose();
