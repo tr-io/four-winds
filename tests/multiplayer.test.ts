@@ -54,6 +54,31 @@ afterEach(async () => {
 });
 
 describe('four-player socket rooms', () => {
+  it('starts with no default tables and tracks online humans through disconnect, restart, and reconnect', async () => {
+    const observer = await client();
+    expect(observer.state.rooms).toEqual([]);
+    expect(observer.state.lobby.tables).toBe(0);
+    const host = await client();
+    await host.command('create', { name: 'Saved practice', rules: PRESETS.mcr, bots: true });
+    const code = host.state.room!.code,
+      token = host.token;
+    const hand = [...host.state.room!.game!.players[0].hand];
+    await flush();
+    expect(observer.state.rooms[0]).toMatchObject({ code, online: 1, bots: 3 });
+    host.socket.disconnect();
+    await flush();
+    expect(observer.state.rooms[0]).toMatchObject({ code, online: 0, bots: 3 });
+    expect(service.rooms.get(code)!.players[0].hand).toEqual(hand);
+    service.close();
+    await new Promise<void>((r) => io.close(() => r()));
+    await serve(join(folder, 'state.json'));
+    const newcomer = await client();
+    expect(newcomer.state.rooms[0]).toMatchObject({ code, online: 0 });
+    await client(token);
+    await flush();
+    expect(newcomer.state.rooms[0]).toMatchObject({ code, online: 1 });
+    expect(service.rooms.get(code)!.players[0].hand).toEqual(hand);
+  });
   it('synchronizes readiness and allows only the host to force the configured next hand', async () => {
     const host = await client(),
       guest = await client();

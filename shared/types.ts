@@ -200,6 +200,8 @@ export type RoomSummary = {
   seats: number;
   humans: number;
   bots: number;
+  online: number;
+  phase: Game['phase'] | 'waiting';
   playing: boolean;
   names: string[];
 };

@@ -9,7 +9,7 @@ import './style.css';
 import './game.css';
 import './refinements.css';
 import { io } from 'socket.io-client';
-import type { AppState, GameView, HandAnalysis, Preset, Rules } from '../shared/types';
+import type { AppState, GameView, HandAnalysis, Preset, RoomSummary, Rules } from '../shared/types';
 import { PRESETS, PRESET_DETAILS, rulesSchema } from '../shared/rules';
 import { WINDS, WIND_SYMBOLS, tileName } from '../shared/tiles';
 import { MahjongTable } from './table';
@@ -271,10 +271,12 @@ function render() {
     } else if (page === 'learn') content.innerHTML = learnHTML();
   }
   if (page === 'play') {
+    const live = state?.rooms.filter((r) => r.online > 0).length ?? 0;
+    const saved = (state?.rooms.length ?? 0) - live;
     document.querySelector('#lobby-label')!.textContent =
       state?.lobby.name ?? 'The Four Winds Club';
     document.querySelector('#lobby-presence')!.textContent = state
-      ? `${state.lobby.members} here · ${state.lobby.tables} ${state.lobby.tables === 1 ? 'table' : 'tables'}`
+      ? `${state.lobby.members} here · ${live} live${saved ? ` · ${saved} saved` : ''}`
       : 'A seat is waiting for you';
     renderRoomList();
   }
@@ -299,14 +301,22 @@ function renderRoomList() {
   const element = document.querySelector('#room-list');
   if (!element) return;
   const rooms = state?.rooms ?? [];
-  element.innerHTML = rooms.length
-    ? rooms
-        .map(
-          (r) =>
-            `<div class="room-row"><div><strong>${esc(r.name)}</strong><small>${esc(r.names.slice(0, 2).join(', '))}${r.names.length > 2 ? ' & friends' : ''}</small></div><span class="rule-pill ${r.preset}">${esc(r.rulesName)}</span><span class="seat-count">${icon('users')} ${r.humans}/4 <small>${r.bots ? `+ ${r.bots} bots` : r.playing ? 'Playing' : 'Open'}</small></span><button class="icon-button" data-join="${r.code}" aria-label="Join ${esc(r.name)}" ${r.humans === 4 ? 'disabled' : ''}>${icon('arrow')}</button></div>`,
-        )
-        .join('')
-    : `<div class="empty-tables"><div class="empty-icon">${icon('users')}</div><div><strong>Be the first to deal.</strong><p>Create one and invite your people. Bots can keep you company.</p></div><button class="button outline small" data-do="create">Open a table ${icon('plus')}</button></div>`;
+  const live = rooms.filter((r) => r.online > 0);
+  const saved = rooms.filter((r) => !r.online);
+  const savedOpen = element.querySelector<HTMLDetailsElement>('.saved-tables')?.open;
+  const row = (r: RoomSummary) => {
+    const status = !r.online
+      ? 'Paused'
+      : r.phase === 'waiting'
+        ? 'Waiting'
+        : r.phase === 'finished'
+          ? 'Match complete'
+          : r.phase === 'ended'
+            ? 'Between hands'
+            : 'Playing';
+    return `<div class="room-row"><div><strong>${esc(r.name)}</strong><small>${status} · ${r.online} online</small></div><span class="rule-pill ${r.preset}">${esc(r.rulesName)}</span><span class="seat-count">${icon('users')} ${r.humans}/4 <small>${r.bots ? `+ ${r.bots} bots` : 'Human seats'}</small></span><button class="icon-button" data-join="${r.code}" aria-label="Join ${esc(r.name)}" ${r.humans === 4 ? 'disabled' : ''}>${icon('arrow')}</button></div>`;
+  };
+  element.innerHTML = `<div id="live-room-list">${live.length ? live.map(row).join('') : `<div class="empty-tables"><div class="empty-icon">${icon('users')}</div><div><strong>No live tables.</strong><p>Create one and invite your people. Bots can keep you company.</p></div><button class="button outline small" data-do="create">Open a table ${icon('plus')}</button></div>`}</div>${saved.length ? `<details class="saved-tables" ${savedOpen ? 'open' : ''}><summary>Saved tables · ${saved.length}</summary><p>No players online. Hands are saved for reconnecting.</p>${saved.map(row).join('')}</details>` : ''}`;
 }
 function roomShell() {
   return `<section class="game-window" aria-label="Mahjong game window">

@@ -32,6 +32,7 @@ A complete MCR hand still needs eight fan before flowers. Click its qualificatio
 
 - **Create a lobby** to group your tables under one invitation code, or use the shared Four Winds Club.
 - **Create a table** with Chinese MCR, Japanese Riichi, Singapore, or a saved house ruleset.
+- Tables appear under **Live tables** while a human player is connected. Disconnected rooms remain in **Saved tables** for reconnecting. A fresh server creates no default tables.
 - Choose **Fill empty seats with bots** to start immediately. Otherwise, invite players and let the host start when all four seats are filled. The host can add bots in the waiting room.
 - A joining friend replaces the first bot seat and inherits its hand and score. A player who leaves is replaced by a bot.
 - Draws arrive automatically. Select a tile and press **Discard**. All available win and meld claims appear as buttons, including each legal chow sequence.

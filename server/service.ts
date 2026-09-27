@@ -459,6 +459,8 @@ export class GameService {
           seats: r.players.length,
           humans: r.players.filter((p) => !p.bot).length,
           bots: r.players.filter((p) => p.bot).length,
+          online: r.players.filter((p) => !p.bot && p.connected).length,
+          phase: r.game?.phase ?? 'waiting',
           playing: !!r.game,
           names: r.players.map((p) => p.profile.name),
         })),

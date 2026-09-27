@@ -1270,3 +1270,23 @@ legend,
     display: none;
   }
 }
+
+.saved-tables {
+  border-top: 1px solid var(--line);
+}
+.saved-tables summary {
+  padding: 16px 22px;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 12px;
+}
+.saved-tables > p {
+  margin: 0;
+  padding: 0 22px 12px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.saved-tables summary:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: -3px;
+}

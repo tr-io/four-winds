@@ -153,6 +153,8 @@ npx playwright test --headed
 
 ## 8. Troubleshooting
 
+- **Old practice tables after restarting:** the server restores `data/four-winds.json`. No rooms are created by default. **Live tables** contains rooms with connected humans; **Saved tables** holds paused rooms with nobody online. Bots do not count as online players. Open the saved section to join an available bot seat, or return with the original browser identity to resume your own seat.
+
 - **Blank page with module MIME errors or `504 Outdated Optimize Dep`:** restart `npm run dev`, then reload the page. If it persists, stop the server, remove only `.cache/vite`, and restart. Four Winds keeps [Vite's dependency cache](https://vite.dev/config/shared-options.html#cachedir) outside `node_modules` because [`npm ci` replaces that directory](https://docs.npmjs.com/cli/v11/commands/npm-ci/). Keep `data/` and browser storage to preserve games and profiles.
 - **Wrong website on localhost:** another development service may own that port. Change Vite's port and use the printed URL. The original workspace had unrelated services on 5173 and 5174.
 - **Reconnecting indefinitely:** ensure the server is running. Check the browser Network panel for `/socket.io/`. In production, verify `ALLOWED_ORIGINS` exactly matches the browser's origin, including `https://` and any nonstandard port, without a trailing slash.
