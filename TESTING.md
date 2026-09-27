@@ -1,0 +1,138 @@
+# Testing Four Winds locally and with other people
+
+## 1. Start the game
+
+Install Node.js **24 LTS**, then run in this directory:
+
+```sh
+npm ci
+npm run dev
+```
+
+When reinstalling dependencies, stop the running dev server with **Ctrl+C** first, run `npm ci`, then start `npm run dev` again. This ensures both processes use the installed package versions.
+
+Open **http://localhost:5175**. You should see the Four Winds lobby, a 3D table preview, and **Connected** in the header. If another service already occupies that address, use the Network address printed by Vite or change the `server.port` in `vite.config.ts`.
+
+Use a recent Chrome, Firefox, Safari, or Edge. WebGL renders the table; the hand buttons and game controls remain available if WebGL is unavailable. Browser sound starts muted; use the speaker button to enable it.
+
+## 2. One person, three bots
+
+1. Open your profile in the top right. Choose a name and color.
+2. Select **Play with bots**, choose a ruleset, and select **Take your seat**.
+3. Watch the table and seat entrance animations. Reduced-motion preferences disable them.
+4. The table fills one game window. Select a tile in the rack, then press **Discard** in the action dock above it. Bots draw, discard, call, and win through the same legal-action engine as humans.
+5. When a discard is claimable, use the **Mahjong / Ron**, **Pong / Pon**, **Kong / Kan**, or **Chow / Chi** buttons in that dock. A different button is shown for each legal chow sequence. The offered tile, countdown, and pending/received status remain visible without scrolling the page.
+6. Review a hand's scoring breakdown, then select **Ready for the next hand**.
+7. Try all three presets. Singapore exposes flowers and animals and draws replacements automatically.
+
+### Table controls and effects
+
+- **Arrange the rack:** drag a tile to another position with a mouse or finger. On a keyboard, focus a tile and press **Alt + Left/Right**. **Sort tiles** restores suit/rank order. Arrange tiles during other players' turns too. Refresh to confirm that your order survives reconnects. Moving a tile must never discard it.
+- **Read the river:** hover over, focus, or tap the circular **Discards** seal in the middle of the board. The ledger groups discards by tile kind, sorted by suit and rank, with each count underneath. Called discards remain in the historical count and show a separate “called” annotation. Tap to pin it; use its close button or **Escape** to dismiss it.
+- **Inspect scoring:** a complete MCR shape shows its qualifying fan beside your hand. Click it for a breakdown. MCR needs eight fan **excluding flowers**. For basic four-set-and-pair play, save a house ruleset with **Minimum fan = 0** before creating a new table.
+- **Claims and wins:** a resolved call produces a character/title cut-in, tile movement, particles, and a brief camera impact. Mahjong has a longer gold burst before the score panel. These visuals do not delay the server or block action buttons. Enable sound for call tones and the win arpeggio. Enable the operating system's reduced-motion setting to check the static presentation.
+- **Game log and help:** use the clock and book buttons in the table toolbar. Both open inside the game view. On desktop, the diagonal-arrow button toggles fullscreen.
+- **Small screens:** try 390 × 844 portrait and 844 × 390 landscape. The rack uses two rows in portrait and moves beside the board in landscape. Claim buttons and discards should remain inside the viewport, including at browser zoom.
+
+For a short match, save a house ruleset with **1 wind**. This is four dealer rotations; dealer repeats can add hands. To speed testing, set 10-second turns and 3-second claims.
+
+## 3. Four players on one computer
+
+**Each player needs a separate browser identity.** Normal tabs in the same browser share the saved profile. Duplicating a tab may also copy its session storage.
+
+Choose either approach:
+
+- Use four browser profiles, different browsers, or separately isolated browser contexts. Multiple windows in one incognito session may still share storage.
+- Open three fresh tabs by pasting **http://localhost:5175/?guest=1** into each new tab. This starts an isolated guest identity in each tab. Do not duplicate an already open guest tab. A guest profile survives reloads in that tab; it is intentionally not saved as the browser's primary profile.
+
+Then:
+
+1. Player A creates a lobby, such as “Sunday Club.” Use **Invite to lobby** to copy its link, or share the six-character lobby code.
+2. Other players open that link, or use the lobby selector and enter the lobby code.
+3. Player A creates a table with bots unchecked.
+4. Other players choose that table or select **Join with a code** and enter its room code.
+5. The host selects **Start the game** when four seats are filled.
+6. Check that everyone sees the same turn, wall count, discards, and claims, and only their own concealed hand.
+
+A room invitation opens the correct lobby automatically. A full table of humans rejects further players. A full table containing bots allows a friend to replace a bot.
+
+## 4. Friends and phones on the same Wi-Fi
+
+1. Start `npm run dev` on the host computer.
+2. Find Vite's **Network** URL, such as `http://192.168.1.20:5175`.
+3. Allow Node through the host's local-network firewall if your operating system asks.
+4. Each player opens that Network URL on their device. `localhost` refers to their own device, so do not share a localhost invitation.
+5. Create a lobby and table from the Network URL. Copied invitations now contain the correct network address.
+6. On mobile, try portrait and landscape modes. Tap a tile, then use the discard button. The clock button opens the live table log; the book button opens table-specific rules.
+
+The page and socket use the same address. You only need to expose Vite's port **5175** on the trusted LAN; its proxy forwards the socket to the local server. The client includes a request-ID fallback for LAN HTTP, where `crypto.randomUUID` may be unavailable.
+
+Use [the HTTPS deployment instructions](DEPLOYMENT.md) for internet play. Do not expose the development server as the public deployment.
+
+## 5. Remote players
+
+Deploy one instance using [DEPLOYMENT.md](DEPLOYMENT.md). Share the site's **HTTPS** address and the room or lobby invitation. The deployment proxy carries both the website and WebSocket connection; players do not need to configure ports or install software.
+
+Anyone with a lobby/room code can join when a seat is available. Codes are invitations, not password-protected accounts. Keep your group's invitation within the intended group.
+
+## 6. Reconnect, bots, and claims checklist
+
+| Test                 | Steps                                                     | Expected behavior                                                                              |
+| -------------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Refresh              | Reload during your turn                                   | Same profile, seat, hand, and current deadline                                                 |
+| Brief disconnect     | Disconnect Wi-Fi, then reconnect                          | Reconnecting banner; server sends current authoritative state                                  |
+| Entire table offline | Disconnect all human players                              | Server stops advancing that table until a human returns; an elapsed deadline is then processed |
+| Server restart       | Stop/restart the server without deleting its data         | Rooms, hands, scores, profiles, and rulesets reload; reconnect with the same browser           |
+| Bot takeover         | Start a bot table, join from a new identity               | Human takes a bot's hand and score; other players see a seat-arrival animation                 |
+| Leave                | Leave a live table                                        | Bot finishes the departing player's seat; remaining humans can keep playing                    |
+| Claim priority       | Two players can claim; lower-priority player clicks first | Pending message remains until higher-priority opportunities answer or expire                   |
+| Same-priority claim  | Two players can win or pung; both click                   | Earliest valid server-received click wins; latency is part of receipt order                    |
+| Timeout              | Let claim clock or turn clock expire                      | Silence passes a claim; turn timeout takes a win or discards the drawn tile                    |
+| Duplicate click      | Double-click a discard/claim                              | Request deduplication and decision IDs prevent a second state transition                       |
+| Fake chips           | Save a ruleset with chips and a non-default conversion    | Hand and instant-bonus point changes update the fake-chip ledger                               |
+| Rules are fixed      | Edit a saved ruleset after creating its room              | That room keeps its original rules snapshot                                                    |
+| Reduced motion       | Enable OS/browser reduced motion                          | Entrance/claim effects stop; gameplay remains usable                                           |
+
+The result screen is available again from the table if you close it. A match has a defined end after its selected winds, followed by a host-controlled rematch.
+
+## 7. Automated checks
+
+```sh
+# Seeded dealing, legal actions, claim ordering, scoring, full hands,
+# four real Socket.IO clients, reconnect, persistence, origin rejection,
+# development module serving after dependency-cache cleanup,
+# local rack ordering and grouped discard counts
+npm test
+
+# Type check and production client build
+npm run build
+
+# Real Chromium interactions: profiles, custom rules, lobby/room creation,
+# four players, turns, reconnect, bots, mobile, safe text, reduced motion,
+# dragging, MCR qualification, grouped discards, claims and win effects
+npx playwright install chromium
+npm run test:e2e
+```
+
+Engine tests use fixed seeds, physical tile-conservation checks, and scoring fixtures. Production tables use a cryptographic shuffle rather than exposing or reusing test seeds. Browser tests start their own production-build server on **3101** and use `test-results/browser-state.json`; they do not use the main game data file. The table-window scenarios also launch isolated in-memory services on random local ports and install deterministic hands directly in those test services. There is no fixture endpoint or game-state override in the deployed app. Playwright saves screenshots and traces on failure.
+
+A convenient targeted run:
+
+```sh
+npx vitest run tests/engine.test.ts
+npx vitest run tests/multiplayer.test.ts
+npx vitest run tests/dev-server.test.ts
+npx playwright test tests/browser/table-window.spec.ts
+npx playwright test --headed
+```
+
+## 8. Troubleshooting
+
+- **Blank page with module MIME errors or `504 Outdated Optimize Dep`:** restart `npm run dev`, then reload the page. If it persists, stop the server, remove only `.cache/vite`, and restart. Four Winds keeps [Vite's dependency cache](https://vite.dev/config/shared-options.html#cachedir) outside `node_modules` because [`npm ci` replaces that directory](https://docs.npmjs.com/cli/v11/commands/npm-ci/). Keep `data/` and browser storage to preserve games and profiles.
+- **Wrong website on localhost:** another development service may own that port. Change Vite's port and use the printed URL. The original workspace had unrelated services on 5173 and 5174.
+- **Reconnecting indefinitely:** ensure the server is running. Check the browser Network panel for `/socket.io/`. In production, verify `ALLOWED_ORIGINS` exactly matches the browser's origin, including `https://` and any nonstandard port, without a trailing slash.
+- **A tab joins as the same person:** use a fresh `?guest=1` tab or a separate browser profile. Do not duplicate the tab.
+- **No claim button:** the server does not consider that action legal. Check the minimum score, whose discard can be chowed, furiten in Riichi, and Singapore's missed-call restrictions.
+- **A valid-looking hand cannot win:** MCR requires qualifying fan before flowers; Riichi requires a yaku before dora; Singapore requires its configured minimum. The table's book button shows its active rules.
+- **Ruleset disappeared after clearing browser data:** the saved bearer credential identifies the profile. Guest identity has no password recovery. Keep the same browser storage to retain access.
+- **Dependency patch fails:** run `npm ci` against the checked-in lockfile. The patches intentionally target the pinned scorer versions; update them together with the scoring tests.

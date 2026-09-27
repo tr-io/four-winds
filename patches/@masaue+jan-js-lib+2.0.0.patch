@@ -1,0 +1,32 @@
+diff --git a/node_modules/@masaue/jan-js-lib/dist/jan/yaku-util.js b/node_modules/@masaue/jan-js-lib/dist/jan/yaku-util.js
+--- a/node_modules/@masaue/jan-js-lib/dist/jan/yaku-util.js
++++ b/node_modules/@masaue/jan-js-lib/dist/jan/yaku-util.js
+@@ -95,7 +95,7 @@
+ exports.chickenHand = chickenHand;
+ function closedWait(completePattern, janpai) {
+     return completePattern.chowList.some((c) => {
+-        return c.middle.number === janpai.number && c.concealedChow;
++        return c.middle.equals(janpai) && c.concealedChow;
+     });
+ }
+ exports.closedWait = closedWait;
+diff --git a/node_modules/@masaue/jan-js-lib/dist/jan/mcr-util.js b/node_modules/@masaue/jan-js-lib/dist/jan/mcr-util.js
+--- a/node_modules/@masaue/jan-js-lib/dist/jan/mcr-util.js
++++ b/node_modules/@masaue/jan-js-lib/dist/jan/mcr-util.js
+@@ -246,6 +246,6 @@
+     static _mentsuYakuList(hand, completeInfo) {
+         const janpaiList = HandUtil.janpaiListWith(hand, completeInfo.janpai);
+-        let yakuList = YakuUtil.sevenPairs(janpaiList) ? [this._sevenPairsYaku(janpaiList)] :
++        let yakuList = hand.allowSevenPairs !== false && YakuUtil.sevenPairs(janpaiList) ? [this._sevenPairsYaku(janpaiList)] :
+             [];
+         HandUtil.completePatternList(hand, completeInfo).forEach((c) => {
+             const newYakuList = [];
+@@ -618,6 +618,8 @@
+     static _yakuListWithFourChows(fourChows, head) {
++        fourChows = fourChows.slice();
++        (0, mentsu_util_1.sortMentsuList)(fourChows);
+         if (this._pureTerminalChows(fourChows, head)) {
+             return [mcr_yaku_1.MCR_YAKU.PURE_TERMINAL_CHOWS];
+         }
+         if (YakuUtil.quadrupleChow(fourChows)) {
+             return [mcr_yaku_1.MCR_YAKU.QUADRUPLE_CHOW];

@@ -1,0 +1,11 @@
+diff --git a/node_modules/@kobalab/majiang-core/lib/hule.js b/node_modules/@kobalab/majiang-core/lib/hule.js
+--- a/node_modules/@kobalab/majiang-core/lib/hule.js
++++ b/node_modules/@kobalab/majiang-core/lib/hule.js
+@@ -697,6 +697,7 @@
+ 
+     for (let mianzi of hule_mianzi(shoupai, rongpai)) {
++        if (mianzi.length == 7 && param.rule['七対子あり'] === false) continue;
+ 
+         let hudi  = get_hudi(mianzi, param.zhuangfeng, param.menfeng,
+                              param.rule);
+         let hupai = get_hupai(mianzi, hudi, pre_hupai, post_hupai, param.rule);

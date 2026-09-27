@@ -1,0 +1,42 @@
+services:
+  game:
+    build: .
+    restart: unless-stopped
+    init: true
+    environment:
+      NODE_ENV: production
+      ALLOWED_ORIGINS: https://${DOMAIN:?Set DOMAIN in .env}
+      DATA_FILE: /app/data/four-winds.json
+    volumes:
+      - game-data:/app/data
+    expose:
+      - '3001'
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    mem_limit: 768m
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?Set DOMAIN in .env}
+      ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL in .env}
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      game:
+        condition: service_healthy
+volumes:
+  game-data:
+  caddy-data:
+  caddy-config:

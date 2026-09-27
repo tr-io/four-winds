@@ -1,0 +1,336 @@
+import { test as base, expect, type Page } from '@playwright/test';
+import express from 'express';
+import { createServer } from 'node:http';
+import { resolve } from 'node:path';
+import { Server } from 'socket.io';
+import { GameService } from '../../server/service';
+import { applyAction, gameView, newPlayer, startGame } from '../../server/engine';
+import { PRESETS } from '../../shared/rules';
+import { makeWall } from '../../shared/tiles';
+import type { Game } from '../../shared/types';
+
+const test = base.extend<{ tableServer: { service: GameService; url: string } }>({
+  tableServer: async ({}, use) => {
+    // Real production client + authoritative service; fixtures never enter the public app.
+    const app = express();
+    app.use(express.static(resolve('dist')));
+    const http = createServer(app);
+    const io = new Server(http);
+    const service = new GameService(io, null);
+    await new Promise<void>((r) => http.listen(0, '127.0.0.1', r));
+    const url = `http://127.0.0.1:${(http.address() as { port: number }).port}`;
+    try {
+      await use({ service, url });
+    } finally {
+      service.close();
+      await new Promise<void>((r) => io.close(() => r()));
+    }
+  },
+});
+
+function tiles(text: string) {
+  const copies = Array(34).fill(0);
+  return [...text.matchAll(/([1-9]+)([mpsz])/g)].flatMap((match) =>
+    [...match[1]].map((n) => {
+      const kind = 'mpsz'.indexOf(match[2]) * 9 + Number(n) - 1;
+      return kind * 4 + copies[kind]++;
+    }),
+  );
+}
+async function setup(page: Page, server: { service: GameService; url: string }, pattern = 'rack') {
+  await page.goto(server.url);
+  await expect(page.locator('#connection-text')).toHaveText('Connected');
+  const session = [...server.service.sessions.values()][0];
+  session.profile.name = 'Akira';
+  const rules = { ...structuredClone(PRESETS.mcr), claimSeconds: 30, turnSeconds: 120 };
+  const players = [
+    session.profile,
+    ...[1, 2, 3].map((i) => ({
+      id: `fixture-${i}`,
+      name: ['Akira', 'Mei', 'Jun', 'Sora'][i],
+      avatar: 'jade',
+      hands: 0,
+      wins: 0,
+    })),
+  ].map((p) => newPlayer(p, rules));
+  const game = startGame(rules, players, 2048);
+  if (pattern !== 'rack') {
+    for (const p of players) {
+      p.hand = [];
+      p.melds = [];
+      p.bonuses = [];
+      p.discards = [];
+      p.drawn = null;
+      p.hasDiscarded = true;
+      p.hasDrawn = true;
+    }
+    const me = players[0];
+    if (pattern === 'complete') {
+      me.hand = tiles('11789p222s');
+      me.drawn = me.hand.at(-1)!;
+      me.drawSource = 'wall';
+      me.melds = [
+        { kind: 'pung', tiles: tiles('111z'), concealed: false, from: 3 },
+        { kind: 'chow', tiles: [20, 24, 16], concealed: false, from: 3 },
+      ];
+      me.bonuses = [138, 139, 136, 137];
+      players[1].discards = [12, 13, 14, 15, 120, 121].map((tile) => ({
+        tile,
+        claimed: false,
+        riichi: false,
+      }));
+      players[3].discards = [{ tile: 108, claimed: true, riichi: false }];
+    } else {
+      me.hand = tiles('1112345678999m');
+      players[3].hand = [3];
+      players[3].drawn = 3;
+      game.turn = 3;
+      if (pattern === 'priority')
+        players[1].hand = [5, 9, 13, 17, 21, 25, 29, 35, 40, 41, 42, 108, 109];
+    }
+    const used = new Set(
+      players.flatMap((p) => [
+        ...p.hand,
+        ...p.bonuses,
+        ...p.discards.map((d) => d.tile),
+        ...p.melds.flatMap((m) => m.tiles),
+      ]),
+    );
+    const pool = makeWall('mcr', 2048).filter((t) => t < 136 && !used.has(t));
+    for (let seat = 1; seat < 4; seat++)
+      while (players[seat].hand.length < (seat === game.turn ? 14 : 13))
+        players[seat].hand.push(pool.shift()!);
+    const dealt = new Set(
+      players.flatMap((p) => [
+        ...p.hand,
+        ...p.bonuses,
+        ...p.discards.map((d) => d.tile),
+        ...p.melds.flatMap((m) => m.tiles),
+      ]),
+    );
+    game.wall = makeWall('mcr', 2048).filter((t) => !dealt.has(t));
+  }
+  session.room = 'TEST01';
+  server.service.rooms.set('TEST01', {
+    lobby: 'FOURWN',
+    code: 'TEST01',
+    name: 'The Jade Room',
+    host: session.profile.id,
+    rules,
+    players,
+    game,
+    createdAt: Date.now(),
+  });
+  server.service.broadcast();
+  await expect(page.locator('.game-window')).toBeVisible();
+  return game;
+}
+async function order(page: Page) {
+  return page
+    .locator('.hand-tiles [data-tile]')
+    .evaluateAll((els) => els.map((el) => Number((el as HTMLElement).dataset.tile)));
+}
+async function inViewport(page: Page, selector: string) {
+  const rect = await page.locator(selector).boundingBox();
+  expect(rect).not.toBeNull();
+  const size = page.viewportSize()!;
+  expect(rect!.x).toBeGreaterThanOrEqual(0);
+  expect(rect!.y).toBeGreaterThanOrEqual(0);
+  expect(rect!.x + rect!.width).toBeLessThanOrEqual(size.width + 1);
+  expect(rect!.y + rect!.height).toBeLessThanOrEqual(size.height + 1);
+}
+
+for (const viewport of [
+  { width: 1440, height: 900 },
+  { width: 390, height: 844 },
+]) {
+  test(`drag, keyboard sort, reconnect, and viewport containment at ${viewport.width}px`, async ({
+    page,
+    tableServer,
+  }) => {
+    await page.setViewportSize(viewport);
+    const game = await setup(page, tableServer);
+    const originalHand = [...game.players[0].hand];
+    const original = await order(page);
+    const first = page.locator('.hand-tiles .tile').first();
+    const last = page.locator('.hand-tiles .tile').last();
+    await expect(first).toBeVisible();
+    const a = (await first.boundingBox())!,
+      b = (await last.boundingBox())!;
+    await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(b.x + b.width - 2, b.y + b.height / 2, { steps: 12 });
+    await page.mouse.up();
+    await expect.poll(() => order(page)).toEqual([...original.slice(1), original[0]]);
+    expect(game.players[0].hand).toEqual(originalHand);
+    expect(game.players[0].discards).toHaveLength(0);
+    // An unrelated server update must not discard local order or interrupt input.
+    tableServer.service.broadcast();
+    await expect.poll(() => order(page)).toEqual([...original.slice(1), original[0]]);
+    await page.reload();
+    await expect.poll(() => order(page)).toEqual([...original.slice(1), original[0]]);
+    await page.locator('.hand-tiles .tile').last().focus();
+    await page.keyboard.press('Alt+ArrowLeft');
+    const moved = await order(page);
+    expect(moved.at(-2)).toBe(original[0]);
+    await page.getByRole('button', { name: 'Sort tiles by suit and rank' }).click();
+    await expect.poll(() => order(page)).toEqual([...original].sort((a, b) => a - b));
+    await inViewport(page, '#action-dock');
+    await inViewport(page, '.hand-tiles');
+    expect(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight)).toBe(
+      true,
+    );
+    await page.locator('.hand-tiles .tile.playable').first().click();
+    await expect(page.locator('.discard-button')).toBeEnabled();
+    await page.locator('.discard-button').click();
+    await expect.poll(() => game.players[0].discards.length).toBe(1);
+  });
+}
+
+test('MCR qualification explains the pictured hand; center ledger groups all discards', async ({
+  page,
+  tableServer,
+}) => {
+  await setup(page, tableServer, 'complete');
+  await expect(page.locator('.score-hint')).toContainText('5/8 fan');
+  await expect(page.locator('[data-action="win"]')).toHaveCount(0);
+  await page.locator('.score-hint').click();
+  await expect(
+    page.getByRole('heading', { name: 'Complete shape. More fan needed.' }),
+  ).toBeVisible();
+  await expect(page.locator('.score-patterns')).toContainText('Prevalent Wind');
+  await expect(page.locator('.score-patterns')).toContainText(
+    'Flowers & seasons · added after qualification',
+  );
+  await page.getByRole('button', { name: 'Back to the hand', exact: true }).click();
+  await page.getByRole('button', { name: 'Show discarded tiles' }).hover();
+  await expect(page.getByRole('region', { name: 'Discarded tiles' })).toBeVisible();
+  await expect(page.locator('.discard-group[data-kind="3"] > strong')).toHaveText('4 / 4');
+  await expect(page.locator('.discard-group[data-kind="30"] > strong')).toHaveText('2 / 4');
+  await expect(page.locator('.discard-group[data-kind="27"] em')).toHaveText('1 called');
+  await page.mouse.move(5, 5);
+  await expect(page.locator('#discard-ledger')).toBeHidden();
+  await page.getByRole('button', { name: 'Show discarded tiles' }).focus();
+  await expect(page.locator('#discard-ledger')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#discard-ledger')).toBeHidden();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole('button', { name: 'Show discarded tiles' }).click();
+  await expect(page.locator('#discard-ledger')).toBeVisible();
+  await inViewport(page, '#discard-ledger');
+});
+
+for (const call of ['pung', 'win']) {
+  test(`all legal claims stay visible on mobile; ${call} resolves with an event animation`, async ({
+    page,
+    tableServer,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    const game = await setup(page, tableServer, 'claim');
+    applyAction(game, 3, game.decision, 'discard:3');
+    tableServer.service.broadcast();
+    const actions = gameView(game, 0).actions;
+    expect(actions.map((a) => a.kind)).toEqual(
+      expect.arrayContaining(['win', 'pung', 'kong', 'chow', 'pass']),
+    );
+    for (const action of actions) {
+      await expect(page.locator(`[data-action="${action.id}"]`)).toBeVisible();
+      await inViewport(page, `[data-action="${action.id}"]`);
+    }
+    // The browser sends a real command; the authoritative engine settles it.
+    await page.locator(`[data-action="${call}"]`).click();
+    await expect(page.locator(`[data-effect="${call}"]`)).toBeVisible();
+    await page.screenshot({ path: `test-results/${call}-cut-in.png` });
+    if (call === 'win') {
+      expect(game.result?.winner).toBe(0);
+      await expect(page.locator('.call-title')).toHaveText('MAHJONG');
+      await expect(page.locator('#modal')).not.toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Akira wins!' })).toBeVisible({
+        timeout: 5000,
+      });
+    } else {
+      expect(game.players[0].melds[0].kind).toBe('pung');
+      await expect(page.locator('.call-title')).toHaveText('PUNG');
+      await expect(page.locator('.discard-button')).toBeVisible();
+      tableServer.service.broadcast();
+      // The same server event cannot restart the animation on an unrelated update.
+      await expect(page.locator(`[data-effect="${call}"]`)).toHaveCount(0, { timeout: 3000 });
+    }
+    expect(errors).toEqual([]);
+  });
+}
+
+test('reduced motion keeps a winning action and its result immediately usable', async ({
+  page,
+  tableServer,
+}) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const game = await setup(page, tableServer, 'claim');
+  applyAction(game, 3, game.decision, 'discard:3');
+  tableServer.service.broadcast();
+  await page.locator('[data-action="win"]').click();
+  await expect(page.getByRole('heading', { name: 'Akira wins!' })).toBeVisible();
+  await expect(page.locator('.call-cut')).toHaveCSS('animation-name', 'none');
+});
+
+test('a received pung remains pending until another player resolves a higher-priority win', async ({
+  page,
+  tableServer,
+}) => {
+  const game = await setup(page, tableServer, 'priority');
+  applyAction(game, 3, game.decision, 'discard:3');
+  tableServer.service.broadcast();
+  expect(gameView(game, 1).actions.some((a) => a.kind === 'win')).toBe(true);
+  await page.locator('[data-action="pung"]').click();
+  await expect(page.locator('.action-context')).toContainText('CALL LOCKED IN');
+  expect(game.phase).toBe('claim');
+  expect(game.players[0].melds).toHaveLength(0);
+  await expect(page.locator('.call-effect')).toHaveCount(0);
+  applyAction(game, 1, game.decision, 'win');
+  tableServer.service.broadcast();
+  await expect(page.locator('.call-player')).toHaveText('Mei');
+  expect(game.result?.winner).toBe(1);
+  expect(game.players[0].melds).toHaveLength(0);
+});
+
+test('touch drag across rack rows does not select or discard a tile', async ({
+  page,
+  tableServer,
+  context,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const game = await setup(page, tableServer);
+  const initial = await order(page);
+  await page
+    .locator('.hand-tiles .tile')
+    .first()
+    .evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map((animation) => animation.finished));
+    });
+  const a = (await page.locator('.hand-tiles .tile').first().boundingBox())!;
+  const b = (await page.locator('.hand-tiles .tile').last().boundingBox())!;
+  const cdp = await context.newCDPSession(page);
+  await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true });
+  await cdp.send('Input.dispatchTouchEvent', {
+    type: 'touchStart',
+    touchPoints: [{ x: a.x + a.width / 2, y: a.y + a.height / 2 }],
+  });
+  for (let i = 1; i <= 12; i++)
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchMove',
+      touchPoints: [
+        {
+          x: a.x + a.width / 2 + ((b.x + b.width - 2 - a.x - a.width / 2) * i) / 12,
+          y: a.y + a.height / 2 + ((b.y + b.height / 2 - a.y - a.height / 2) * i) / 12,
+        },
+      ],
+    });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await expect.poll(() => order(page)).toEqual([...initial.slice(1), initial[0]]);
+  await expect(page.locator('.hand-tiles .selected')).toHaveCount(0);
+  expect(game.players[0].discards).toHaveLength(0);
+  await inViewport(page, '.hand-tiles');
+  await cdp.detach();
+});

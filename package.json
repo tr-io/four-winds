@@ -1,0 +1,46 @@
+{
+  "name": "four-winds",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k -n server,client -c green,cyan \"tsx watch server/index.ts\" \"vite --host 0.0.0.0\"",
+    "build": "tsc --noEmit && vite build",
+    "start": "tsx server/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "tsc --noEmit",
+    "postinstall": "patch-package",
+    "test:e2e": "playwright test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "dependencies": {
+    "@fontsource/cormorant-garamond": "^5.3.0",
+    "@fontsource/dm-sans": "^5.3.0",
+    "@kobalab/majiang-core": "^1.4.1",
+    "@masaue/jan-js-lib": "^2.0.0",
+    "express": "^5.2.1",
+    "helmet": "^8.3.0",
+    "patch-package": "^8.0.1",
+    "socket.io": "^4.8.4",
+    "socket.io-client": "^4.8.4",
+    "three": "^0.186.1",
+    "tsx": "^4.23.15",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.3",
+    "@types/three": "^0.186.0",
+    "concurrently": "^10.0.5",
+    "prettier": "^3.9.9",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.1",
+    "vitest": "^5.0.2"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}
