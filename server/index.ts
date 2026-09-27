@@ -1,3 +1,4 @@
+import { startMetrics } from './metrics';
 import express from 'express';
 import helmet from 'helmet';
 import { handshakeGuard } from './security';
@@ -36,10 +37,12 @@ const io = new Server(http, {
   allowRequest: handshakeGuard(),
 });
 const service = new GameService(io, resolve(process.env.DATA_FILE ?? 'data/four-winds.json'));
+const stopMetrics = startMetrics(() => service.metrics());
 const port = Number(process.env.PORT ?? 3001);
 http.listen(port, '0.0.0.0', () => console.log(`Four Winds server · http://localhost:${port}`));
 for (const signal of ['SIGINT', 'SIGTERM'])
   process.on(signal, () => {
+    stopMetrics();
     service.close();
     io.close();
     http.close(() => process.exit(0));

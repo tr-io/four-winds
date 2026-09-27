@@ -93,3 +93,18 @@ describe('private scored winning routes', () => {
     ).toBe(true);
   });
 });
+
+// Browser suggestions receive the exact public view, never authoritative secrets.
+it.each(['mcr', 'riichi', 'singapore'] as Preset[])(
+  '%s visible-state analysis matches server scoring',
+  async (preset) => {
+    const { gameView } = await import('../server/engine');
+    const { analysisGame } = await import('../shared/analysis-view');
+    const g = fixture(preset);
+    const visible = analysisGame(gameView(g, 0));
+    expect(visible.players.slice(1).every((p) => p.hand.length === 0)).toBe(true);
+    expect(visible.wall).toEqual([0, 1, 2, 3, 4]);
+    expect(visible.ura).toEqual([]);
+    expect(analyzeHand(visible, 0)).toEqual(analyzeHand(g, 0));
+  },
+);

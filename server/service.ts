@@ -14,9 +14,9 @@ import type {
   LobbyView,
   ChatMessage,
   HandRecord,
+  RoomSummary,
 } from '../shared/types';
 import { PRESETS, rulesSchema } from '../shared/rules';
-import { analyzeHand } from './hand-analysis';
 import {
   applyAction,
   botAction,
@@ -58,7 +58,12 @@ export class GameService {
   private chatDue = new Map<string, number>();
   private sockets = new Map<string, Set<Socket>>();
   private seen = new Map<string, Map<string, unknown>>();
+  private persistenceWrites = 0;
+  private persistenceMaxMs = 0;
+  private persistenceBytes = 0;
+  private summaries = new Map<string, string>();
   private botDue = new Map<string, { decision: number; at: number }>();
+  private closed = false;
   private timer: ReturnType<typeof setInterval>;
   constructor(
     public io: Server,
@@ -91,24 +96,44 @@ export class GameService {
     this.timer.unref();
   }
   close() {
+    if (this.closed) return;
+    this.closed = true;
     clearInterval(this.timer);
     this.persist();
   }
+  metrics() {
+    const snapshot = {
+      profiles: this.sessions.size,
+      rooms: this.rooms.size,
+      connectedPlayers: this.sockets.size,
+      connections: [...this.sockets.values()].reduce((n, sockets) => n + sockets.size, 0),
+      activeGames: [...this.rooms.values()].filter(
+        (r) => r.game && r.players.some((p) => !p.bot && p.connected),
+      ).length,
+      persistenceWrites: this.persistenceWrites,
+      persistenceMaxMs: this.persistenceMaxMs,
+      persistenceBytes: this.persistenceBytes,
+    };
+    this.persistenceWrites = 0;
+    this.persistenceMaxMs = 0;
+    return snapshot;
+  }
   persist() {
     if (!this.file) return;
+    const started = performance.now();
     mkdirSync(dirname(this.file), { recursive: true });
-    writeFileSync(
-      this.file + '.tmp',
-      JSON.stringify({
-        version: 1,
-        sessions: [...this.sessions.values()],
-        rooms: [...this.rooms.values()],
-        lobbies: [...this.lobbies.values()],
-        chat: this.chat,
-      } satisfies Store),
-      { mode: 0o600 },
-    );
+    const serialized = JSON.stringify({
+      version: 1,
+      sessions: [...this.sessions.values()],
+      rooms: [...this.rooms.values()],
+      lobbies: [...this.lobbies.values()],
+      chat: this.chat,
+    } satisfies Store);
+    writeFileSync(this.file + '.tmp', serialized, { mode: 0o600 });
     renameSync(this.file + '.tmp', this.file);
+    this.persistenceWrites++;
+    this.persistenceBytes = Buffer.byteLength(serialized);
+    this.persistenceMaxMs = Math.max(this.persistenceMaxMs, performance.now() - started);
   }
   private connect(socket: Socket) {
     const supplied = socket.handshake.auth?.token;
@@ -161,6 +186,7 @@ export class GameService {
         reply({ ok: false, error: 'Please slow down for a moment.' });
         return;
       }
+      let refreshOnError = false;
       try {
         const cmd = z
           .object({
@@ -169,6 +195,12 @@ export class GameService {
             data: z.unknown().optional(),
           })
           .parse(raw);
+        refreshOnError = ![
+          'analyze-hand',
+          'history-detail',
+          'lesson-check',
+          'lesson-claims',
+        ].includes(cmd.type);
         const seen = this.seen.get(s.profile.id) ?? new Map<string, unknown>();
         this.seen.set(s.profile.id, seen);
         if (seen.has(cmd.id)) {
@@ -182,12 +214,18 @@ export class GameService {
         if (
           !['analyze-hand', 'history-detail', 'lesson-check', 'lesson-claims'].includes(cmd.type)
         ) {
-          this.persist();
-          this.broadcast();
+          if (cmd.type !== 'action') this.persist();
+          if (
+            ['action', 'ready', 'force-next-hand', 'start', 'rematch'].includes(cmd.type) &&
+            s.room
+          )
+            this.broadcastRooms(new Set([s.room]));
+          else this.broadcast();
         }
         reply(response);
       } catch (e) {
-        this.broadcast();
+        // Refresh a stale caller without amplifying bad input across other tables.
+        if (refreshOnError) socket.emit('state', this.state(s));
         reply({
           ok: false,
           error:
@@ -201,10 +239,14 @@ export class GameService {
     });
     socket.on('disconnect', () => {
       set.delete(socket);
+      if (this.closed) return;
       if (!set.size) {
         const r = s.room ? this.rooms.get(s.room) : null;
         const p = r?.players.find((p) => p.profile.id === s.profile.id);
         if (p) p.connected = false;
+        this.sockets.delete(s.profile.id);
+        this.seen.delete(s.profile.id);
+        this.chatDue.delete(s.profile.id);
       }
       this.persist();
       this.broadcast();
@@ -430,7 +472,10 @@ export class GameService {
       if (r.host === s.profile.id) r.host = r.players.find((p) => !p.bot)?.profile.id ?? '';
       if (!r.players.some((p) => !p.bot)) {
         if (r.savedBy?.length) r.pausedAt = Date.now();
-        else this.rooms.delete(r.code);
+        else {
+          this.rooms.delete(r.code);
+          for (let seat = 0; seat < 4; seat++) this.botDue.delete(`${r.code}:${seat}`);
+        }
       }
       return {};
     }
@@ -455,14 +500,7 @@ export class GameService {
       return {};
     }
     if (type === 'analyze-hand') {
-      const r = requireRoom();
-      if (!r.game) throw new Error('Deal a hand first.');
-      return {
-        analysis: analyzeHand(
-          r.game,
-          r.players.findIndex((p) => p.profile.id === s.profile.id),
-        ),
-      };
+      throw new Error('Please refresh the page. Winning routes now run on your device.');
     }
     if (type === 'ready') {
       const r = requireRoom();
@@ -578,19 +616,7 @@ export class GameService {
       serverTime: Date.now(),
       rooms: [...this.rooms.values()]
         .filter((r) => r.lobby === s.lobby)
-        .map((r) => ({
-          code: r.code,
-          name: r.name,
-          rulesName: r.rules.name,
-          preset: r.rules.preset,
-          seats: r.players.length,
-          humans: r.players.filter((p) => !p.bot).length,
-          bots: r.players.filter((p) => p.bot).length,
-          online: r.players.filter((p) => !p.bot && p.connected).length,
-          phase: r.game?.phase ?? 'waiting',
-          playing: !!r.game,
-          names: r.players.map((p) => p.profile.name),
-        })),
+        .map((r) => this.roomSummary(r)),
       room:
         room && seat >= 0
           ? {
@@ -605,12 +631,53 @@ export class GameService {
           : null,
     };
   }
+  private roomSummary(r: Room): RoomSummary {
+    return {
+      code: r.code,
+      name: r.name,
+      rulesName: r.rules.name,
+      preset: r.rules.preset,
+      seats: r.players.length,
+      humans: r.players.filter((p) => !p.bot).length,
+      bots: r.players.filter((p) => p.bot).length,
+      online: r.players.filter((p) => !p.bot && p.connected).length,
+      phase: r.game?.phase ?? 'waiting',
+      playing: !!r.game,
+      names: r.players.map((p) => p.profile.name),
+    };
+  }
+  /** Private snapshots go only to changed tables; everyone else gets small directory deltas. */
+  private broadcastRooms(codes: Set<string>) {
+    const changed = [...codes].flatMap((code) => {
+      const room = this.rooms.get(code);
+      if (!room) return [];
+      const summary = this.roomSummary(room),
+        key = JSON.stringify(summary);
+      if (key === this.summaries.get(code)) return [];
+      this.summaries.set(code, key);
+      return [{ lobby: room.lobby, summary }];
+    });
+    for (const set of this.sockets.values()) {
+      const session = set.values().next().value?.data.session as Session | undefined;
+      if (!session) continue;
+      if (session.room && codes.has(session.room)) {
+        const state = this.state(session);
+        for (const socket of set) socket.emit('state', state);
+      } else {
+        const rooms = changed.filter((r) => r.lobby === session.lobby).map((r) => r.summary);
+        if (rooms.length) for (const socket of set) socket.emit('rooms-changed', rooms);
+      }
+    }
+  }
   broadcast() {
+    this.summaries.clear();
+    for (const room of this.rooms.values())
+      this.summaries.set(room.code, JSON.stringify(this.roomSummary(room)));
     for (const set of this.sockets.values())
       for (const socket of set) socket.emit('state', this.state(socket.data.session));
   }
   private tick() {
-    let changed = false;
+    const changed = new Set<string>();
     const now = Date.now();
     for (const room of this.rooms.values()) {
       const g = room.game;
@@ -619,7 +686,7 @@ export class GameService {
       // on return the existing deadline determines whether an automatic turn is due.
       if (!room.players.some((p) => !p.bot && p.connected)) continue;
       const old = g.phase;
-      if (tickGame(g, now)) changed = true;
+      if (tickGame(g, now)) changed.add(room.code);
       for (let seat = 0; seat < 4; seat++)
         if (g.players[seat].bot) {
           const key = `${room.code}:${seat}`;
@@ -632,16 +699,16 @@ export class GameService {
             const a = botAction(g, seat);
             if (a) {
               applyAction(g, seat, g.decision, a, now);
-              changed = true;
+              changed.add(room.code);
               due.at = now + 1200;
             }
           }
         }
       this.recordResult(room, old);
     }
-    if (changed) {
+    if (changed.size) {
       this.persist();
-      this.broadcast();
+      this.broadcastRooms(changed);
     }
   }
 }

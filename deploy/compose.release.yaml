@@ -8,6 +8,8 @@ services:
     environment:
       NODE_ENV: production
       ALLOWED_ORIGINS: https://${DOMAIN:?Set DOMAIN}
+      # Port 3001 is private; Caddy overwrites X-Forwarded-For.
+      TRUST_PROXY: '1'
       DATA_FILE: /app/data/four-winds.json
     volumes:
       - game-data:/app/data

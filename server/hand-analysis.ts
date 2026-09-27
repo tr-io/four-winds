@@ -81,7 +81,7 @@ export function analyzeHand(game: Game, seat: number): HandAnalysis {
           .map((k) => ({ c: Array.from({ length: 34 }, (_, i) => (i === k ? 2 : 0)), last: 0 }));
     const steps = pairsOnly ? 7 : 4 - me.melds.length;
     for (let depth = 0; depth < steps; depth++) {
-      const next = new Map<string, { c: number[]; last: number }>();
+      const next = new Map<string, { c: number[]; last: number; cost: number; key: string }>();
       for (const state of states)
         for (let i = state.last; i < sets.length; i++) {
           const c = [...state.c];
@@ -92,10 +92,10 @@ export function analyzeHand(game: Game, seat: number): HandAnalysis {
           )
             continue;
           const key = c.join(',');
-          if (!next.has(key)) next.set(key, { c, last: i });
+          if (!next.has(key)) next.set(key, { c, last: i, cost: cost(c), key });
         }
       states = [...next.values()]
-        .sort((a, b) => cost(a.c) - cost(b.c) || a.c.join(',').localeCompare(b.c.join(',')))
+        .sort((a, b) => a.cost - b.cost || a.key.localeCompare(b.key))
         .slice(0, 64);
     }
     for (const state of states.slice(0, 12)) add(name, state.c);

@@ -5,27 +5,29 @@ before relying on the snapshot. Start with the user's latest request.
 
 ## Resume here
 
-1. Current work is on **`fix/table-hands-and-player-inspection`**, based on freshly pulled
-   `main` at `a25a265`. [PR #2](https://github.com/tr-io/four-winds/pull/2) and the workflow/handoff
-   [PR #4](https://github.com/tr-io/four-winds/pull/4) are merged. The user explicitly requested
-   a new branch from updated main for this fix. Changes are committed and pushed to
-   [PR #5](https://github.com/tr-io/four-winds/pull/5); check its state before future follow-ups.
-   The latest screenshot's missing row was the **local player's hand**: `table.ts` explicitly
-   skipped it in live games. All four hands now appear on the board, with only the viewer's own
-   faces visible. The HTML rack remains the input surface. All hand rows share opening-deal
-   visibility; a tile moved into discards/melds becomes public immediately. Hidden animation
-   pieces are excluded from tooltip raycasts.
-   The whole player card is now a native button, including its avatar, points, and seat wind.
-   It opens melds, bonus tiles, and numbered discards in play order, with Called/Riichi labels.
-   Mouse, Enter/Space, and touch are covered. Opponent concealed hands stay private.
-   The prior viewport fix still reserves canvas space around the seat cards and keeps the
-   board/ledger usable at browser zoom. See `client/table-viewport.css` and `table-camera.ts`.
-   Verification on Node 24: **93 unit/network tests**, **38 desktop browser tests**, and
-   **14 mobile tests** (Android Chrome/iPhone WebKit) pass, along with types/build, formatting,
-   and diff checks. The missing-row regression failed before the renderer fix and passed after;
-   setup/reload tests now raycast every local face with normal and reduced motion. Viewport
-   checks include all four rows at eight sizes (320–1280px). Screenshots are in
-   `.cache/ui-review/player-tiles/` (ignored). Gameplay rules and production state are unchanged.
+1. Current work is **`fix/analysis-latency-and-server-capacity`**, based on updated `main`
+   at `66eb04f` after [PR #5](https://github.com/tr-io/four-winds/pull/5) merged. The user reported
+   Winning routes stalling the server and requested a 50–100-game / 400-player architecture audit
+   with diagrams. The branch moves suggestions to a cancellable **browser Web Worker** using
+   the existing scorer and the player's visible snapshot. Legacy `analyze-hand` commands return
+   a cheap refresh error; actual wins remain authoritative. Search ranking precomputes costs.
+   Game/timer/bot updates send private snapshots only to affected tables, with small public
+   `rooms-changed` events for the rest. Duplicate saves and shutdown disconnect storms are removed.
+   Proxy-aware handshake limits are opt-in via `TRUST_PROXY=1` in release Compose. Aggregate
+   `server-metrics` logs run once a minute. Gameplay rules and production state are unchanged.
+   See [architecture diagrams](docs/architecture.md) and [capacity audit](docs/capacity-audit.md).
+   **Capacity caveat:** local fresh-state 100-game/400-client test passed (3,356 actions, p95
+   70 ms, no failures). Ten archived hands per player caused 15-second timeouts and >1 GiB RSS.
+   Sustained 400-player support needs a transactional store with separate hand archives; that
+   migration also needs backup/restore and rollback changes. Do not claim production readiness.
+   `npm run test:load` uses isolated temporary storage; the documented history test intentionally
+   reproduces the outstanding bottleneck. Existing production Compose must be updated on-host
+   to enable the forwarded-client-address fix; image releases do not replace that file.
+   Verification: 100 unit/network, 41 desktop, 14 mobile, 5 deployment tests passed, with types,
+   build, formatting and Compose validation. Worker failure/retry and production CSP checks
+   also pass. Load results are recorded in the audit; private scratch profiles are ignored.
+   The prior tile/card fixes remain: all four board hands render (own faces, opponent backs), and
+   clicking the whole player card opens public melds, bonuses, and numbered discards.
 2. **How to play** is now an interactive page with preset switching, tile explanations, a moving
    turn walkthrough, hand grouping/checking, and competing-claim examples. `server/lessons.ts`
    validates separate preset examples through the existing engine in isolated games; scoring,
@@ -103,10 +105,10 @@ Recent work:
 
 Important implementation details:
 
-- `server/hand-analysis.ts` provides bounded suggestions using the player's hand and public tiles.
-  It calls the actual scorer under an ordinary self-draw assumption. Suggestions are neither
-  exhaustive nor guaranteed available draws. The private `analyze-hand` ACK does not broadcast
-  or persist state. `client/hand-results.ts` renders routes and complete winning hands.
+- `server/hand-analysis.ts` is a pure bounded search now imported by `client/analysis-worker.ts`.
+  It uses the actual scorer under an ordinary self-draw assumption, with no server analysis
+  request. Suggestions are neither exhaustive nor guaranteed available draws.
+  `client/hand-results.ts` renders routes and complete winning hands.
 - `nextHandSeconds`, `advanceWhenReady`, and `hostCanAdvance` are server-enforced, with defaults
   60/true/true. Zero disables the timer; all three mechanisms cannot be disabled together.
   Old saved rules get defaults on load. Ready/force commands carry the current decision ID.

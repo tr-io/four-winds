@@ -36,7 +36,7 @@ Use a recent Chrome, Firefox, Safari, or Edge. WebGL renders the table; the hand
 
 - **Recent actions:** the **Last discard** bubble retains the discarded tile and its player after a claim or the next draw. Stacked beneath it, **Last turn** shows the most recent draw, discard, call, bonus, or win. Reload to verify these restore from the server's log. An opponent's draw never reveals its tile.
 - **Tile names:** hover any rack, meld, bonus, indicator, discard, claim, or result tile for its English name. Keyboard focus works on HTML tiles; on touch screens, tap. Face-up tiles on the 3D table also support pointer inspection. Tile backs must never reveal names.
-- **Your hand:** select the meld meter beside **Sort tiles**. Declared melds fill the four set slots; the inspector shows the current concealed tiles, larger melds, suit counts, and possible pairs. Open the **Winning routes** tab for suggested completions, tiles to collect/release, scoring patterns, and their point payments. These bounded-search estimates use your hand and public information, assuming an ordinary self-draw; they are not guaranteed future draws. The server still decides whether a hand qualifies to win. Hover individual exposed tiles in either view.
+- **Your hand:** select the meld meter beside **Sort tiles**. Declared melds fill the four set slots; the inspector shows the current concealed tiles, larger melds, suit counts, and possible pairs. Open the **Winning routes** tab for suggested completions, tiles to collect/release, scoring patterns, and their point payments. These bounded-search estimates use your hand and public information, assuming an ordinary self-draw; they are not guaranteed future draws. Analysis runs in a browser Web Worker and stops when the dialog closes; it sends no analysis request to the server. The server still decides whether a hand qualifies to win. Hover individual exposed tiles in either view.
 - **Arrange the rack:** drag a tile to another position with a mouse or finger. On a keyboard, focus a tile and press **Alt + Left/Right**. **Sort tiles** restores suit/rank order. Receiving a new tile automatically sorts the entire rack. Your arrangement survives other state updates until the next incoming tile. Arrange tiles during other players' turns too. Refresh to confirm that your order survives reconnects. Moving a tile must never discard it.
 - **Read the river:** hover over or focus the compact **Discards** button at the bottom-right of the board. Click/tap it to toggle a pinned ledger that stays open when you move away. The ledger groups discards by tile kind, sorted by suit and rank, with each count underneath. Called discards remain in the historical count and show a separate “called” annotation. Tap again to unpin and close it, or use its close button or **Escape**.
 - **Inspect scoring:** a complete MCR shape shows its qualifying fan beside your hand. Click it for a breakdown. MCR needs eight fan **excluding flowers**. For basic four-set-and-pair play, save a house ruleset with **Minimum fan = 0** before creating a new table.
@@ -208,3 +208,10 @@ Use the normal browser's notification permission prompt to opt into turn alerts.
 open in the background and play from another identity to test an incoming turn or claim.
 Check audible garden, rain and pond ambience after a pointer/keyboard gesture; switching to a
 hidden tab should mute ambience. These depend on browser permissions and audio output.
+
+## Capacity tests
+
+`npm run test:load` creates 100 isolated tables and 400 socket clients with temporary persistence.
+See the [capacity audit](docs/capacity-audit.md) for workload controls, acceptance thresholds,
+measurements, and the known failure with retained hand histories. Keep load tests on isolated
+staging or local services. The [architecture guide](docs/architecture.md) explains the data flow.

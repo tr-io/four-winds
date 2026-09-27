@@ -452,3 +452,30 @@ docker run --rm --name four-winds-test -p 127.0.0.1:3102:3001 \
 Open `http://localhost:3102`. The development setting here permits plain HTTP only for this
 loopback smoke test. Production uses HTTPS. For the original local-build deployment, `compose.yaml`
 and `.env.example` remain available; the release workflow uses `deploy/compose.release.yaml`.
+
+## Capacity and monitoring
+
+The [architecture guide](docs/architecture.md) explains the single-owner deployment. The
+[capacity audit](docs/capacity-audit.md) records fresh-state 400-client measurements and the
+remaining archive bottleneck; sustained 400-player support is not yet established.
+
+The server writes aggregate `server-metrics` JSON logs once a minute: event-loop p99/max delay,
+RSS, connection/game counts, snapshot size, write count, and maximum save time. No private
+player data is included. Inspect them with `docker compose -f deploy/compose.release.yaml logs game`
+from a checkout with the required release environment, or use the installed deployment log tools.
+
+The release Compose service sets `TRUST_PROXY=1` because backend port 3001 is private and Caddy
+supplies the client address. This prevents the handshake limit from grouping all visitors under
+Caddy’s IP. Leave this unset for a directly exposed backend; forwarding headers from arbitrary
+clients must not establish their own rate-limit identity.
+
+Existing installations keep Compose in `/etc/four-winds/compose.yaml`; an image release alone
+does not update that file. Before the next deployment, copy the reviewed Compose file onto the
+host and install it from that checkout:
+
+```sh
+sudo install -o root -g root -m 600 deploy/compose.release.yaml /etc/four-winds/compose.yaml
+```
+
+The next normal deployment recreates the game container with `TRUST_PROXY=1`.
+This configuration update has not been applied to production.

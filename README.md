@@ -24,7 +24,7 @@ Open **http://localhost:3001**. `PORT` and `DATA_FILE` can override the server p
 
 ## Table controls
 
-The Three.js table, player panels, tile rack, claims, and timers share one game window. Drag tiles to reorder them, or focus a tile and use **Alt + Left/Right**. **Sort tiles** restores suit order, and each incoming tile automatically sorts the rack. Hover or focus the small **Discards** button beside the center river for a sorted tile/count ledger; click to pin or unpin it. The toolbar opens the game log, table settings, and rules. Last-discard and last-turn bubbles retain the recent action. Hover or focus tiles for English names; tap on mobile. Select the meld meter to inspect your hand and declared sets, then open **Winning routes** for suggested completions and server-calculated points. A shuffle-and-deal opening, claim cut-ins, and a separate mahjong celebration respect reduced-motion settings. Enable sound for synchronized tile clacks.
+The Three.js table, player panels, tile rack, claims, and timers share one game window. Drag tiles to reorder them, or focus a tile and use **Alt + Left/Right**. **Sort tiles** restores suit order, and each incoming tile automatically sorts the rack. Hover or focus the small **Discards** button beside the center river for a sorted tile/count ledger; click to pin or unpin it. The toolbar opens the game log, table settings, and rules. Last-discard and last-turn bubbles retain the recent action. Hover or focus tiles for English names; tap on mobile. Select the meld meter to inspect your hand and declared sets, then open **Winning routes** for suggested completions and points calculated locally in a background worker. A shuffle-and-deal opening, claim cut-ins, and a separate mahjong celebration respect reduced-motion settings. Enable sound for synchronized tile clacks.
 
 A complete MCR hand still needs eight fan before flowers. Click its qualification badge for a server-calculated breakdown; use a saved house ruleset with a lower minimum for basic-hand play.
 
@@ -52,6 +52,8 @@ The ruleset editor changes actual legal actions, timing, winning thresholds, set
 
 ## Test and deploy
 
+- **[Architecture](docs/architecture.md)** — system, command, worker, and deployment diagrams.
+- **[Capacity audit](docs/capacity-audit.md)** — 50/100-game measurements and the remaining archival-storage blocker.
 - **[TESTING.md](TESTING.md)** — local setup, four players on one computer, phones on a LAN, remote groups, reconnects, bot takeover, and automated checks.
 - **[docs/game-state-testing.md](docs/game-state-testing.md)** — targeted commands and scenarios for starts, draws, claims, wins, exhaustion, scoring, and network state.
 - **[DEPLOYMENT.md](DEPLOYMENT.md)** — DigitalOcean VPS, subdomain/HTTPS, restricted CI key, GitHub tagged releases, health checks, rollback, and backups.
@@ -86,6 +88,6 @@ For the current agent handoff and next steps, read [MEMORY.md](MEMORY.md).
 
 State is atomically saved to `data/four-winds.json` after accepted commands and bot/timer transitions. Profiles and saved rules are associated with a random bearer credential stored in your browser; server storage contains only its hash. Reloading or reopening the browser restores the same profile. Clearing browser storage loses that credential. A `?guest=1` tab provides an isolated test identity.
 
-One server process owns the game state. Use one instance and a persistent volume. This is designed for small groups, with limits of 100 rooms, 100 lobbies, 30 saved rulesets per profile, and 10,000 guest profiles. It does not include accounts/password recovery, moderation, matchmaking ratings, distributed state, or tournament referee penalties. Bots are deterministic heuristics that use their own hand and public information; they are practice partners.
+One server process owns the game state. Use one instance and a persistent volume. Local fresh-state load tests pass at 100 games / 400 socket clients, but retained hand histories currently prevent sustained capacity at that level; see the [capacity audit](docs/capacity-audit.md). Limits are 100 rooms, 100 lobbies, 30 saved rulesets per profile, and 10,000 guest profiles. It does not include accounts/password recovery, moderation, matchmaking ratings, distributed state, or tournament referee penalties. Bots are deterministic heuristics that use their own hand and public information; they are practice partners.
 
 See [THIRD_PARTY.md](THIRD_PARTY.md) for scoring and asset attribution. Artwork is drawn locally; fonts are bundled, so playing does not require a font CDN.
