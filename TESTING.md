@@ -150,6 +150,9 @@ npm test
 # Type check and production client build
 npm run build
 
+# Verify the checked-in avatars match their fixed generator settings
+npm run avatars:check
+
 # Real Chromium interactions: profiles, custom rules, lobby/room creation,
 # four players, turns, reconnect, bots, mobile, safe text, reduced motion,
 # dragging, MCR qualification, grouped discards, claims and win effects,
@@ -164,6 +167,9 @@ npm run test:mobile
 # Restricted deployment commands, health checks, recovery, state-version guard
 npm run test:deploy
 ```
+
+See [browser performance](docs/browser-performance.md) for the optional throttled startup
+benchmark. Run it separately from the browser suites so CPU contention does not skew timings.
 
 Engine tests use fixed seeds, physical tile-conservation checks, and scoring fixtures. Production tables use a cryptographic shuffle rather than exposing or reusing test seeds. Browser tests start their own production-build server on **3101** and use `test-results/browser-state.json`; they do not use the main game data file. The table-window scenarios also launch isolated in-memory services on random local ports and install deterministic hands directly in those test services. There is no fixture endpoint or game-state override in the deployed app. Playwright saves screenshots and traces on failure.
 

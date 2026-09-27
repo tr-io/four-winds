@@ -16,7 +16,8 @@ import type {
   HandRecord,
   RoomSummary,
 } from '../shared/types';
-import { PRESETS, rulesSchema } from '../shared/rules';
+import { PRESETS } from '../shared/rules';
+import { rulesSchema } from '../shared/rules-schema';
 import {
   applyAction,
   botAction,

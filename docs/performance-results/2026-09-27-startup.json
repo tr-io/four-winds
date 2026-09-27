@@ -1,0 +1,88 @@
+{
+  "date": "2026-09-27",
+  "baselineCommit": "37ee8dd",
+  "before": {
+    "build": ".cache/bundle-before",
+    "conditions": "Pixel 7 viewport; Chromium; cold cache; 4x CPU slowdown; 1.6 Mbps down; 150ms latency; gzip; reduced motion",
+    "results": [
+      {
+        "readyMs": 4127,
+        "firstPaintMs": 3936,
+        "javascriptBytes": 391198,
+        "scriptMs": 618
+      },
+      {
+        "readyMs": 4068,
+        "firstPaintMs": 3764,
+        "javascriptBytes": 391198,
+        "scriptMs": 408
+      },
+      {
+        "readyMs": 3631,
+        "firstPaintMs": 3448,
+        "javascriptBytes": 391198,
+        "scriptMs": 395
+      },
+      {
+        "readyMs": 3681,
+        "firstPaintMs": 3492,
+        "javascriptBytes": 391198,
+        "scriptMs": 383
+      },
+      {
+        "readyMs": 3656,
+        "firstPaintMs": 3456,
+        "javascriptBytes": 391198,
+        "scriptMs": 368
+      }
+    ],
+    "median": {
+      "readyMs": 3681,
+      "firstPaintMs": 3492,
+      "javascriptBytes": 391198,
+      "scriptMs": 395
+    }
+  },
+  "after": {
+    "build": "dist",
+    "conditions": "Pixel 7 viewport; Chromium; cold cache; 4x CPU slowdown; 1.6 Mbps down; 150ms latency; gzip; reduced motion",
+    "results": [
+      {
+        "readyMs": 2906,
+        "firstPaintMs": 2732,
+        "javascriptBytes": 190841,
+        "scriptMs": 467
+      },
+      {
+        "readyMs": 2658,
+        "firstPaintMs": 2280,
+        "javascriptBytes": 190841,
+        "scriptMs": 316
+      },
+      {
+        "readyMs": 2573,
+        "firstPaintMs": 2368,
+        "javascriptBytes": 190841,
+        "scriptMs": 336
+      },
+      {
+        "readyMs": 2486,
+        "firstPaintMs": 2300,
+        "javascriptBytes": 190841,
+        "scriptMs": 323
+      },
+      {
+        "readyMs": 2473,
+        "firstPaintMs": 2292,
+        "javascriptBytes": 190841,
+        "scriptMs": 320
+      }
+    ],
+    "median": {
+      "readyMs": 2573,
+      "firstPaintMs": 2300,
+      "javascriptBytes": 190841,
+      "scriptMs": 323
+    }
+  }
+}

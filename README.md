@@ -53,6 +53,7 @@ The ruleset editor changes actual legal actions, timing, winning thresholds, set
 ## Test and deploy
 
 - **[Architecture](docs/architecture.md)** — system, command, worker, and deployment diagrams.
+- **[Browser performance](docs/browser-performance.md)** — bundle sizes, avatar generation, and reproducible mobile startup measurements.
 - **[Capacity audit](docs/capacity-audit.md)** — 50/100-game measurements and the remaining archival-storage blocker.
 - **[TESTING.md](TESTING.md)** — local setup, four players on one computer, phones on a LAN, remote groups, reconnects, bot takeover, and automated checks.
 - **[docs/game-state-testing.md](docs/game-state-testing.md)** — targeted commands and scenarios for starts, draws, claims, wins, exhaustion, scoring, and network state.

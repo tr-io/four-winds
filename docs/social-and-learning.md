@@ -99,8 +99,9 @@ metadata; games saved by older builds use a sequential neutral wall until the ne
 
 ## Assets and attribution
 
-Avatars are generated locally from DiceBear 9.4.3 packages. No avatar API request or user
-uploaded image is used. Adventurer and Adventurer Neutral are by Lisa Wischofsky under
+The 24 fixed avatars are generated ahead of time from DiceBear 9.4.3 packages and served as
+local SVG files. No avatar API request or user uploaded image is used. See
+[avatar maintenance and browser performance](browser-performance.md). Adventurer and Adventurer Neutral are by Lisa Wischofsky under
 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Bottts is by Pablo Stanley and is
 free for personal and commercial use. The profile picker links DiceBear, the style pages,
 and licenses. The garden interaction uses original CSS shapes; ambient sounds are synthesized.

@@ -27,6 +27,23 @@ before relying on the snapshot. Start with the user's latest request.
    check and visual review. GitHub CI was running at handoff. Screenshots are in
    `.cache/ui-review/presence-saves/` (ignored). Production has not been changed.
 
+   Follow-up on the same branch: the user approved reducing browser startup JavaScript.
+   Replaced runtime DiceBear generators with 24 checked-in SVGs, each byte-identical to the
+   previous data-URI image. Vite serves hashed image URLs; generator dependencies are now dev
+   dependencies. `npm run avatars:generate` refreshes the files and `avatars:check` runs in CI.
+   Lessons (including their CSS) load when opened; shared rule validation lives in
+   `shared/rules-schema.ts` and is downloaded only on form submission. The schema itself is
+   unchanged. Async guards prevent delayed downloads from replacing newer pages or submitting
+   closed forms; download failures preserve navigation/drafts and show recovery guidance.
+   Main JS: **1,262 → 719 kB**, gzip **394 → 193 kB**, below the unchanged 850 kB warning limit.
+   Five cold-cache runs with 4× CPU throttling, 1.6 Mbps down, and 150 ms latency improved median
+   lobby-ready time **3.68 → 2.57 seconds**. These are local Chromium measurements, not physical
+   phone or production results. See [browser performance](docs/browser-performance.md) and
+   `npm run measure:startup -- dist 5` for the repeatable isolated benchmark. Three.js still
+   loads eagerly because the lobby uses it. Follow-up verification: **101 unit/network, 56 desktop,
+   and 16 Android/iPhone tests pass**, along with types, build, avatar checks, formatting and diff
+   checks. The previous PR head passed GitHub CI; the bundle follow-up CI is pending after push.
+
    Previous PR #6 moved Winning routes into a cancellable browser worker, rejected legacy
    server analysis requests cheaply, narrowed socket broadcasts, removed duplicate saves, and
    added proxy-aware limits and aggregate metrics. It also sequenced opening title → dice →

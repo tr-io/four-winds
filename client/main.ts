@@ -3,7 +3,7 @@ import { SocialUI, eventLogHTML, gardenHTML } from './social';
 import { SavedTables } from './saved-tables';
 import { avatarImage, avatarAttribution } from './avatars';
 import { AVATAR_CHOICES, avatarChoice } from '../shared/avatars';
-import { LearnPage } from './learn';
+import type { LearnPage } from './learn';
 import '@fontsource/dm-sans/latin-400.css';
 import '@fontsource/dm-sans/latin-500.css';
 import '@fontsource/dm-sans/latin-600.css';
@@ -26,7 +26,7 @@ import {
 } from './table-theme';
 import { io } from 'socket.io-client';
 import type { AppState, GameView, Preset, RoomSummary, Rules } from '../shared/types';
-import { PRESETS, PRESET_DETAILS, rulesSchema } from '../shared/rules';
+import { PRESETS, PRESET_DETAILS } from '../shared/rules';
 import { WINDS, WIND_SYMBOLS, tileName } from '../shared/tiles';
 import { MahjongTable } from './table';
 import { tileStatic } from './tile-art';
@@ -78,6 +78,7 @@ const icon = (name: string, cls = '') =>
   `<svg class="icon ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name] ?? icons.leaf}</svg>`;
 const mark = `<svg class="wind-mark" viewBox="0 0 40 40" aria-hidden="true"><path d="m20 1 6 13 13 6-13 6-6 13-6-13L1 20l13-6Z" fill="currentColor"/><path d="m20 11 3 6 6 3-6 3-3 6-3-6-6-3 6-3Z" fill="var(--paper)"/></svg>`;
 let learnPage: LearnPage | null = null;
+let learnLoad = 0;
 let theme: TableTheme = 'jade-night';
 let themePlayer = '';
 function applyTheme(next: TableTheme) {
@@ -312,6 +313,7 @@ function connectionUI() {
     : `<div class="reconnect-banner">${icon('globe')} Connecting to the table. Your seat will be restored automatically.</div>`;
 }
 function disposeTable() {
+  learnLoad++;
   learnPage?.dispose();
   learnPage = null;
   rack?.dispose();
@@ -322,6 +324,19 @@ function disposeTable() {
   lastVisual = '';
   table?.dispose();
   table = null;
+}
+async function loadLessons() {
+  const version = ++learnLoad;
+  const current = () => version === learnLoad && mounted === 'learn' && !state?.room;
+  content.innerHTML = '<section class="empty-tables" role="status">Loading lessons…</section>';
+  try {
+    const { LearnPage } = await import('./learn');
+    if (current()) learnPage = new LearnPage(content, command);
+  } catch {
+    if (current())
+      content.innerHTML =
+        '<section class="empty-tables"><p role="alert">Lessons could not load. Check your connection and reload the page.</p><button class="button outline" data-do="reload">Reload page</button><button class="text-button" data-page="play">Back to play</button></section>';
+  }
 }
 function mountScene(id: string, preview: boolean) {
   try {
@@ -348,7 +363,7 @@ function render() {
     if (page === 'play') {
       content.innerHTML = lobbyHTML();
       mountScene('hero-table', true);
-    } else if (page === 'learn') learnPage = new LearnPage(content, command);
+    } else if (page === 'learn') void loadLessons();
   }
   if (page === 'play') {
     const live = state?.rooms.filter((r) => r.online > 0).length ?? 0;
@@ -1174,6 +1189,9 @@ app.addEventListener('click', async (e) => {
       return;
     }
     switch (button.dataset.do) {
+      case 'reload':
+        location.reload();
+        break;
       case 'table-settings':
         showTableSettings();
         break;
@@ -1427,8 +1445,21 @@ modal.addEventListener('submit', async (e) => {
         await command('join-lobby', data.get('code'));
         break;
       case 'rules-form': {
+        let schema;
+        try {
+          schema = (await import('../shared/rules-schema')).rulesSchema;
+        } catch {
+          toast(
+            'Could not check these rules. Check your connection and reload before trying again.',
+            true,
+          );
+          if (submit) submit.disabled = false;
+          return;
+        }
+        // A slow download must not submit a replaced form or close a different dialog.
+        if (!form.isConnected || !modal.open) return;
         readRulesForm();
-        const checked = rulesSchema.safeParse(editing);
+        const checked = schema.safeParse(editing);
         if (!checked.success) {
           toast(checked.error.issues[0].message, true);
           if (submit) submit.disabled = false;

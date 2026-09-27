@@ -59,7 +59,8 @@ volume. Current backups copy `four-winds.json`; this matters before changing the
 | `client/table.ts`, `hand-rack.ts`               | Cosmetic table and interactive tile rack                                       |
 | `client/hand-analysis.ts`, `analysis-worker.ts` | Cancellable local route analysis                                               |
 | `shared/analysis-view.ts`                       | Convert a public seat view to an ordinary self-draw analysis scenario          |
-| `shared/types.ts`, `rules.ts`, `tiles.ts`       | Protocol, domain types, presets, validation, tile identities                   |
+| `shared/types.ts`, `rules.ts`, `tiles.ts`       | Protocol, domain types, presets, tile identities                               |
+| `shared/rules-schema.ts`                        | Shared validation; downloaded by the browser when submitting edited rules      |
 | `server/service.ts`                             | Authentication, sessions, lobbies, tables, delivery, storage, bot scheduling   |
 | `server/engine.ts`                              | Authoritative state transitions and legal actions                              |
 | `server/scoring.ts`, `shapes.ts`                | Pure scoring/shape logic, also bundled into the analysis worker                |
